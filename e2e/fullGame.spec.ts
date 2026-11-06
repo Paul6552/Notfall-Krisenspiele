@@ -8,7 +8,12 @@ import { solveShield } from '../tests/solveShield'
 
 const NET = '/?net=local'
 
-async function setup(context: BrowserContext, n: number) {
+async function advance(host: Page) {
+  await host.getByRole('button', { name: /^Weiter:/ }).click()
+  await host.getByRole('button', { name: /^Ja, weiter/ }).click()
+}
+
+async function setup(context: BrowserContext, n: number, films = false) {
   const host = await context.newPage()
   await host.goto(`${NET}#/`)
   await host.getByLabel('Wie viele Teams').fill(String(n))
@@ -27,6 +32,7 @@ async function setup(context: BrowserContext, n: number) {
     teams.push(p)
   }
   await host.getByRole('button', { name: 'Automatisch verteilen' }).click()
+  if (!films) await host.getByLabel('Filme zwischen den Ereignissen').uncheck()
   await host.getByRole('button', { name: 'Übung starten' }).click()
   await expect(teams[0].getByTestId('phase-title')).toHaveText('Check-in')
   const as = async (role: RoleId) => {
@@ -36,7 +42,7 @@ async function setup(context: BrowserContext, n: number) {
     return p
   }
   const next = async (title: RegExp) => {
-    await host.getByRole('button', { name: /^Weiter:/ }).click()
+    await advance(host)
     for (const p of teams) await expect(p.getByTestId('phase-title')).toHaveText(title)
   }
   return { host, teams, code, as, next }
@@ -247,6 +253,79 @@ for (const n of [2, 6, 7]) {
   })
 }
 
+test('Filme laufen bei allen gleichzeitig und hängen vom Spielverlauf ab', async ({ context }) => {
+  const { host, teams, as } = await setup(context, 2, true)
+  const film = teams[1].getByTestId('cutscene')
+  await expect(film).toContainText('Mission Red Planet')
+  await expect(host.getByTestId('cutscene')).toBeVisible()
+  await teams[1].getByRole('button', { name: 'Überspringen' }).click()
+  await expect(film).toHaveCount(0)
+  await expect(host.getByTestId('cutscene')).toBeVisible() // Überspringen gilt nur für das eigene Team
+  await host.getByRole('button', { name: 'Überspringen' }).click()
+  await teams[0].getByRole('button', { name: 'Überspringen' }).click()
+
+  await advance(host)
+  for (const p of [host, ...teams]) await p.getByRole('button', { name: 'Überspringen' }).click()
+  const bridge = await as('LS')
+  await bridge.getByRole('button', { name: /GO für den Start/ }).click()
+  await advance(host)
+  await expect(film).toContainText('Erfolgreich gestartet')
+  await expect(teams[0].getByTestId('cutscene')).toContainText('auf dem Weg zum Mars')
+
+  // Neuladen während des Films: läuft weiter, danach ist die Oberfläche wieder bedienbar
+  await teams[1].reload()
+  await expect(film).toBeVisible()
+  await expect(film).toHaveCount(0, { timeout: 20_000 })
+  await expect(teams[1].getByTestId('phase-title')).toHaveText(/Ereignis 2/)
+})
+
+test('Übungsübersicht erklärt, was beübt wird', async ({ page }) => {
+  await page.goto(`${NET}#/uebungen?teams=3`)
+  const item = page.getByText('Desinformationskampagnen ausstehen')
+  await expect(item).toBeHidden()
+  await page.getByText('Was wird beübt?').click()
+  await expect(item).toBeVisible()
+  await expect(page.locator('.trains li')).toHaveCount(5)
+})
+
+test('Weiter muss bestätigt werden', async ({ context }) => {
+  const { host, teams, next } = await setup(context, 2)
+  await next(/Ereignis 1/)
+  await next(/Ereignis 2/)
+  const title = teams[0].getByTestId('phase-title')
+  const weiter = host.getByRole('button', { name: /^Weiter:/ })
+  const dialog = host.locator('dialog.confirm')
+
+  // Der Klick allein schaltet nicht weiter, offene Punkte werden genannt
+  await weiter.click()
+  await expect(dialog).toContainText('Wirklich weiter zu „Ionensturm“?')
+  await expect(dialog).toContainText('−15 Hülle und −25 Sauerstoff')
+  await host.waitForTimeout(500)
+  await expect(title).toHaveText(/Ereignis 2/)
+
+  // Fokus liegt auf Abbrechen: ein versehentliches Enter löst nichts aus
+  await expect(host.getByRole('button', { name: 'Abbrechen' })).toBeFocused()
+  await host.keyboard.press('Enter')
+  await expect(dialog).toHaveCount(0)
+  await expect(title).toHaveText(/Ereignis 2/)
+
+  // Escape bricht ebenfalls ab
+  await weiter.click()
+  await host.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(title).toHaveText(/Ereignis 2/)
+
+  // Doppelklick auf Weiter schaltet nicht weiter
+  await weiter.dblclick({ force: true }).catch(() => {})
+  await host.waitForTimeout(300)
+  await expect(title).toHaveText(/Ereignis 2/)
+  await host.getByRole('button', { name: 'Abbrechen' }).click()
+
+  // Erst die Bestätigung schaltet weiter
+  await advance(host)
+  await expect(title).toHaveText(/Ereignis 3/)
+})
+
 test('Spielleiter schließt den Browser mitten im Reaktor-Neustart', async ({ context }) => {
   const { host: first, teams, as, next } = await setup(context, 2)
   for (const title of [/Ereignis 1/, /Ereignis 2/, /Ereignis 3/, /Ereignis 4/]) await next(title)
@@ -260,7 +339,7 @@ test('Spielleiter schließt den Browser mitten im Reaktor-Neustart', async ({ co
     const box = li.getByRole('checkbox')
     if (!keep.some((k) => text.includes(k)) && (await box.isChecked())) { await box.click(); await expect(box).not.toBeChecked() }
   }
-  await first.getByRole('button', { name: /^Weiter:/ }).click()
+  await advance(first)
   await expect(teams[0].getByTestId('phase-title')).toHaveText(/Ereignis 6/)
   await first.getByLabel('Dauer des Neustarts').fill('8')
   await (await as('LS')).getByRole('button', { name: 'Reaktor-Neustart einleiten' }).click()
@@ -330,6 +409,7 @@ test('Hilfe, Mindestanzahl und Spielleiter als Brücke', async ({ context }) => 
   await team.getByRole('button', { name: 'Beitreten' }).click()
   await expect(team.getByText('Willkommen an Bord')).toBeVisible()
   await page.getByRole('button', { name: 'Automatisch verteilen' }).click()
+  await page.getByLabel('Filme zwischen den Ereignissen').uncheck()
   await page.getByRole('button', { name: 'Übung starten' }).click()
   await page.getByRole('tab', { name: 'Brücke' }).click()
   await expect(page.locator('.room', { hasText: 'Leitstelle' })).toContainText('Brücke – LdS')
@@ -351,6 +431,7 @@ test('Externe Kommunikation blendet den Chat aus', async ({ context }) => {
   await team.getByRole('button', { name: 'Beitreten' }).click()
   await expect(team.getByText('Willkommen an Bord')).toBeVisible()
   await page.getByRole('button', { name: 'Automatisch verteilen' }).click()
+  await page.getByLabel('Filme zwischen den Ereignissen').uncheck()
   await page.getByRole('button', { name: 'Übung starten' }).click()
   await expect(team.getByText('externe Tools')).toBeVisible()
   await expect(team.getByLabel('Nachricht')).toHaveCount(0)

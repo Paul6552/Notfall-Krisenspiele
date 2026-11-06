@@ -44,6 +44,12 @@ export function Overview({ teamCount }: { teamCount: number }) {
               ))}
             </ol>
           </details>
+          <details>
+            <summary>Was wird beübt?</summary>
+            <ul className="trains">
+              {GAME.trains.map((t) => <li key={t}>{t}</li>)}
+            </ul>
+          </details>
           <button className="btn primary" onClick={() => void start()}>Spiel starten</button>
         </div>
       </article>

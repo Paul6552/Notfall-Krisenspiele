@@ -4,6 +4,7 @@ import { GM, RuleError } from '../game/types'
 import type { Action, GameState } from '../game/types'
 import { HostSession } from '../net/host'
 import { acquireHostLock, loadGame } from '../storage/db'
+import { CutsceneOverlay } from '../ship/Cutscene'
 import { Console } from './Console'
 import { GameRoom } from './GameRoom'
 import { Lobby } from './Lobby'
@@ -114,6 +115,7 @@ function HostGame({ session }: { session: HostSession }) {
 
   return (
     <div>
+      <CutsceneOverlay cutscene={state.cutscene} teams={state.teams} roleOwner={state.roleOwner} />
       {warning}
       {bridgeView && (
         <div className="tabs" role="tablist" aria-label="Ansicht">

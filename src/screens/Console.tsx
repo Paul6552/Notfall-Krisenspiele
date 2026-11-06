@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { E6_INJECTS, PHASE_INFO, ROLES, SECTOR_ORDER, roleLabel } from '../game/content/flugZumMars'
 import { Lessons } from '../events/Lessons'
 import { project } from '../game/projection'
+import { advanceWarnings } from '../game/reducer'
 import { ALL, GM, PHASES, ROLE_IDS } from '../game/types'
 import type { Action, GameState, ShipStatus, View } from '../game/types'
 import { ShipScene } from '../ship/Ship'
@@ -29,6 +30,36 @@ function progress(view: View, state: GameState): string[] {
     case 'e7': return [`Gesendete Sektoren-Codes: ${SECTOR_ORDER.filter((r) => state.e7.sent[r]).length} von 6`, `Versuche übrig: ${state.e7.attempts}`, `Gelandet: ${state.e7.landed ? 'ja' : 'nein'}`]
     default: return []
   }
+}
+
+/** Eigener Dialog statt window.confirm: Der würde den Browser anhalten und damit auch Herzschlag und Speichern. */
+function ConfirmAdvance({ state, onCancel, onConfirm }: { state: GameState; onCancel: () => void; onConfirm: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null)
+  const cancel = useRef<HTMLButtonElement>(null)
+  const next = PHASES[PHASES.indexOf(state.phase) + 1]
+  const warnings = advanceWarnings(state)
+  useEffect(() => {
+    ref.current?.showModal()
+    cancel.current?.focus()
+  }, [])
+  return (
+    <dialog ref={ref} className="confirm" aria-labelledby="confirm-title" onCancel={onCancel}>
+      <div className="stack">
+        <h2 id="confirm-title">Wirklich weiter zu „{PHASE_INFO[next].short}“?</h2>
+        <p>Alle Teams wechseln sofort in den nächsten Schritt. Das lässt sich nicht rückgängig machen.</p>
+        {warnings.length > 0 ? (
+          <Notice tone="warn">
+            <strong>Noch offen in „{PHASE_INFO[state.phase].short}“:</strong>
+            <ul>{warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+          </Notice>
+        ) : state.phase !== 'checkin' && <Notice tone="good">Alle Aufgaben dieses Schritts sind erledigt.</Notice>}
+        <div className="row wrap between">
+          <button ref={cancel} className="btn" onClick={onCancel}>Abbrechen</button>
+          <button className="btn primary" onClick={onConfirm}>Ja, weiter zu {PHASE_INFO[next].short}</button>
+        </div>
+      </div>
+    </dialog>
+  )
 }
 
 function Injects({ state, act }: { state: GameState; act: (a: Action) => void }) {
@@ -72,6 +103,7 @@ function Injects({ state, act }: { state: GameState; act: (a: Action) => void })
 export function Console({ state, act, error }: { state: GameState; act: (a: Action) => void; error: { message: string } | null }) {
   const view = useMemo(() => project(state, GM), [state])
   const [reveal, setReveal] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const paused = Boolean(state.pausedAt)
   const next = PHASES[PHASES.indexOf(state.phase) + 1]
   const debrief = state.phase === 'lessons' || state.phase === 'done'
@@ -99,7 +131,7 @@ export function Console({ state, act, error }: { state: GameState; act: (a: Acti
           {error && <Notice tone="bad">{error.message}</Notice>}
           <p className="briefing">{PHASE_INFO[state.phase].briefing}</p>
           <div className="row wrap">
-            {next && <button className="btn primary" onClick={() => act({ type: 'advance' })}>Weiter: {PHASE_INFO[next].short}</button>}
+            {next && <button className="btn primary" onClick={() => setConfirming(true)}>Weiter: {PHASE_INFO[next].short}</button>}
             <button className="btn" onClick={() => act({ type: paused ? 'resume' : 'pause' })}>{paused ? 'Fortsetzen' : 'Pausieren'}</button>
             {state.failure && <button className="btn" onClick={() => act({ type: 'clearFailure' })}>Scheitern aufheben und weiterspielen</button>}
             {state.phase === 'e6' && state.comms.silence && <button className="btn danger" onClick={() => act({ type: 'flagViolation' })}>Verstoß erfassen</button>}
@@ -158,6 +190,16 @@ export function Console({ state, act, error }: { state: GameState; act: (a: Acti
         </section>
       </div>
       <Chat view={view} act={act} />
+      {confirming && next && (
+        <ConfirmAdvance
+          state={state}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            setConfirming(false)
+            act({ type: 'advance' })
+          }}
+        />
+      )}
     </div>
   )
 }

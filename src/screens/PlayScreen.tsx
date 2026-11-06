@@ -3,6 +3,7 @@ import { go } from '../app/router'
 import { ClientSession } from '../net/client'
 import { isLocalNet } from '../net/transport'
 import { deleteClient, loadClient, loadGame } from '../storage/db'
+import { CutsceneOverlay } from '../ship/Cutscene'
 import { ShipScene } from '../ship/Ship'
 import { GameRoom } from './GameRoom'
 import { CenterMessage, Notice } from './shared'
@@ -95,6 +96,7 @@ function Connected({ session, code, onReset }: { session: ClientSession; code: s
   }
   return (
     <>
+      <CutsceneOverlay cutscene={view.cutscene} teams={view.teams} roleOwner={view.roleOwner} offset={clockOffset} />
       {lost}
       <GameRoom view={status === 'hostLost' ? { ...view, pausedAt: view.pausedAt ?? Date.now() } : view} act={session.dispatch} error={rejected} clockOffset={clockOffset} />
     </>

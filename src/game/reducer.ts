@@ -3,6 +3,7 @@ import {
   E6_DEFAULT_RESTART_SECONDS, E7_ATTEMPTS, E7_DELAY_SECONDS, GAME, LANDING_CODE, MODULES, PIECE_SPECS, ROLES, SECTOR_CODES,
   SECTOR_ORDER,
 } from './content/flugZumMars'
+import { cutsceneFor } from './content/cutscenes'
 import { isEmojiOnly } from './emoji'
 import { piecePolygon, shieldCoverage } from './geometry'
 import { ALL, GM, PHASES, ROLE_IDS, RuleError } from './types'
@@ -27,7 +28,7 @@ export function createGame(opts: { code: string; teamCount: number; now: number;
     gameId: GAME.id,
     createdAt: opts.now,
     teamCount: opts.teamCount,
-    settings: { gmMode: 'neutral', comm: 'ingame', restartSeconds: E6_DEFAULT_RESTART_SECONDS, ...opts.settings },
+    settings: { gmMode: 'neutral', comm: 'ingame', restartSeconds: E6_DEFAULT_RESTART_SECONDS, cutscenes: true, ...opts.settings },
     teams: [],
     roleOwner: Object.fromEntries(ROLE_IDS.map((r) => [r, null])) as Record<RoleId, string | null>,
     phase: 'lobby',
@@ -37,6 +38,7 @@ export function createGame(opts: { code: string; teamCount: number; now: number;
     startedAt: null,
     ship: { hull: 100, oxygen: 100, morale: 100, timeBuffer: 30 },
     failure: null,
+    cutscene: null,
     chat: [],
     nextMsgId: 1,
     log: [],
@@ -231,6 +233,48 @@ function evaluateReactor(s: GameState, now: number) {
   if (off.includes('display')) add('Cockpit-Scheiben beschlagen: schlechtere Sicht für die Piloten.')
 }
 
+/** Was offen ist und was beim Weiterschalten passiert. Die Werte entsprechen finishPhase. */
+export function advanceWarnings(s: GameState): string[] {
+  const list: string[] = []
+  switch (s.phase) {
+    case 'e1': {
+      if (s.e1.decision !== 'go') list.push('Die Brücke hat noch kein GO gegeben: −10 Minuten Zeitpuffer.')
+      else {
+        const open = E1_QUESTIONS.filter((_, i) => !s.e1.marks[i]).length
+        if (open) list.push(`${open} Prüfpunkte sind nicht als korrekt bestätigt: −${5 * open} Hülle.`)
+      }
+      break
+    }
+    case 'e2':
+      if (!s.e2.repaired) list.push('Das Hitzeschild ist nicht repariert: −15 Hülle und −25 Sauerstoff.')
+      break
+    case 'e3':
+      if (!s.e3.arrived) list.push('Das Schiff hat das Asteroidenfeld nicht durchquert: −20 Hülle.')
+      if (s.e3.found.mast.length < E3_DIFFS.mast.length) list.push('Der Funkmast ist nicht vollständig geprüft: −5 Minuten Zeitpuffer.')
+      break
+    case 'e4':
+      if (s.comms.net !== 'backup' || s.e4.checkedIn.length < s.teams.length) list.push('Nicht alle Teams sind am Notkanal: −5 Minuten Zeitpuffer.')
+      break
+    case 'e5': {
+      const kw = totalKw(s.e5.off)
+      if (s.e5.off.includes('cooling')) list.push('Die Reaktorkühlung ist aus: Die Mission scheitert durch Kernschmelze.')
+      else if (kw > E5_LIMIT_KW) list.push(`Die Last liegt bei ${kw} kW: Die Mission scheitert durch eine Explosion.`)
+      if (!s.e5.confirmed) list.push('Die Brücke hat die Lastverteilung noch nicht bestätigt.')
+      break
+    }
+    case 'e6':
+      if (!s.e6.done) list.push('Der Reaktor-Neustart ist nicht abgeschlossen: −15 Hülle.')
+      break
+    case 'e7':
+      if (!s.e7.landed) list.push('Die ARES 1 ist nicht gelandet: Die Mission gilt als gescheitert.')
+      break
+    case 'lessons':
+      list.push('Die Übung wird damit beendet.')
+      break
+  }
+  return list
+}
+
 /**
  * Wird beim Öffnen eines gespeicherten Spiels aufgerufen. Die Zeit ohne Spielleiter zählt nicht:
  * Das Spiel steht ab dem letzten Lebenszeichen still, bis die Spielleitung fortsetzt.
@@ -327,7 +371,9 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
         if (problems.length) throw new RuleError(problems.join(' '))
         s.startedAt = now
       } else finishPhase(s, now)
+      const from = s.phase
       s.phase = PHASES[idx + 1]
+      s.cutscene = s.settings.cutscenes === false ? null : cutsceneFor(from, s, totalKw(s.e5.off), now, (s.cutscene?.id ?? 0) + 1)
       enterPhase(s, now)
       log(s, now, `Phase gestartet.`, 'info')
       break

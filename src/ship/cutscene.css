@@ -1,0 +1,144 @@
+.cut { position: fixed; inset: 0; z-index: 100; overflow: hidden; background: #03050c; color: #fff; animation: c-in .6s both; }
+@keyframes c-in { from { opacity: 0; } }
+/* Filmbalken */
+.cut::before, .cut::after { content: ''; position: absolute; left: 0; right: 0; height: 7vh; background: #000; z-index: 8; animation: c-bar .9s both; }
+.cut::before { top: 0; } .cut::after { bottom: 0; --from: 100%; }
+@keyframes c-bar { from { transform: translateY(var(--from, -100%)); } }
+
+.c-skip { position: absolute; right: 16px; bottom: calc(3.5vh - 16px); z-index: 12; font: inherit; font-size: .85rem; color: #cfd8e2; background: rgb(255 255 255 / .1); border: 1px solid rgb(255 255 255 / .3); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.c-skip:hover { background: rgb(255 255 255 / .2); }
+
+.c-caption { position: absolute; left: 16px; right: 16px; top: 15vh; z-index: 7; text-align: center; animation: c-caption 1s cubic-bezier(.2, .8, .2, 1) both; text-shadow: 0 2px 22px rgb(0 0 0 / .85); }
+.c-caption h1 { font-size: clamp(2rem, 7vw, 4.6rem); font-weight: 800; letter-spacing: .01em; margin: 0 0 .2em; }
+.c-caption p { font-size: clamp(1rem, 2.4vw, 1.5rem); margin: 0; color: #e6edf4; }
+.c-caption.good h1 { color: #ffd36b; }
+.c-caption.warn h1 { color: #ffb36b; }
+.c-caption.bad h1 { color: #ff7a6b; }
+@keyframes c-caption { from { opacity: 0; transform: translateY(18px) scale(.96); } }
+
+.c-rocket { display: block; height: 100%; width: auto; overflow: visible; }
+.c-flame { transform-origin: 40px 196px; animation: c-flicker .12s infinite alternate; }
+@keyframes c-flicker { to { transform: scaleY(1.18) scaleX(.92); } }
+.c-ship { position: absolute; left: 50%; bottom: 17vh; height: 46vh; transform: translateX(-50%); z-index: 4; }
+.c-stars { position: absolute; inset: 0; background-image: radial-gradient(1.6px 1.6px at 12% 22%, #fff, transparent), radial-gradient(1px 1px at 33% 68%, #fff, transparent), radial-gradient(1.4px 1.4px at 58% 18%, #cfe, transparent), radial-gradient(1px 1px at 72% 42%, #fff, transparent), radial-gradient(1.8px 1.8px at 88% 76%, #fff, transparent), radial-gradient(1px 1px at 46% 88%, #fff, transparent); background-size: 340px 340px; animation: c-drift 40s linear infinite; }
+@keyframes c-drift { to { background-position: -680px 340px; } }
+
+/* Startrampe */
+.cut-intro, .cut-prep { background: linear-gradient(#1b2a52, #c8644a 62%, #f4b56a 78%); }
+.c-ground { position: absolute; left: 0; right: 0; bottom: 0; height: 19vh; background: linear-gradient(#3e5636, #1f2c1d); z-index: 3; }
+.c-pad { position: absolute; left: 50%; top: -8px; width: 34vh; height: 16px; transform: translateX(-50%); background: #5a6876; border-radius: 3px; }
+.c-tower { position: absolute; left: calc(50% + 12vh); bottom: 100%; width: 3.4vh; height: 48vh; background: repeating-linear-gradient(45deg, #2f3b47 0 3px, transparent 3px 11px), repeating-linear-gradient(-45deg, #2f3b47 0 3px, transparent 3px 11px); border-inline: 3px solid #2f3b47; }
+.cut-intro .c-ship, .cut-intro .c-ground { animation: c-zoom 9s ease-out both; transform-origin: 50% 100%; }
+.cut-intro .c-ship { transform: translateX(-50%); animation-name: c-zoom-ship; }
+@keyframes c-zoom { from { transform: scale(1.14); } }
+@keyframes c-zoom-ship { from { transform: translateX(-50%) scale(1.14); } }
+.c-beam { position: absolute; bottom: 17vh; width: 90px; height: 90vh; background: linear-gradient(rgb(255 255 220 / 0), rgb(255 255 220 / .3)); clip-path: polygon(0 0, 100% 0, 58% 100%, 42% 100%); transform-origin: 50% 100%; z-index: 2; }
+.c-beam.left { left: 16%; animation: c-sweep 5s ease-in-out infinite alternate; }
+.c-beam.right { right: 16%; --a: 14deg; --b: -22deg; animation: c-sweep 6s ease-in-out infinite alternate; }
+@keyframes c-sweep { from { transform: rotate(var(--b, 22deg)); } to { transform: rotate(var(--a, -14deg)); } }
+.c-vapor { position: absolute; left: 62%; top: 42%; width: 44px; height: 44px; border-radius: 50%; background: rgb(255 255 255 / .55); filter: blur(10px); animation: c-vapor 2.4s ease-out infinite; }
+@keyframes c-vapor { to { transform: translate(60px, -60px) scale(2.8); opacity: 0; } }
+.c-clock { position: absolute; left: 0; right: 0; bottom: 8vh; text-align: center; z-index: 5; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: clamp(1.4rem, 4vw, 2.6rem); color: #ffd36b; }
+
+/* Start */
+.c-day { position: absolute; inset: 0; background: linear-gradient(#4f8fc4, #a8d0e6 72%, #dcecf0); animation: c-fade 3.4s 4.2s ease-in both; }
+@keyframes c-fade { to { opacity: 0; } }
+.cut-launch .c-ground { animation: c-sink 3s 3.5s ease-in both; }
+@keyframes c-sink { to { transform: translateY(78vh); } }
+.c-limb { position: absolute; left: -30vw; right: -30vw; height: 90vw; top: 100%; border-radius: 50%; background: radial-gradient(circle at 50% 8%, #4aa3df, #123a6b 55%, #071a33 80%); box-shadow: 0 -8px 60px #5cb7ff; animation: c-limb 4.5s 6.2s ease-out both; }
+@keyframes c-limb { to { transform: translateY(-28vh); } }
+.c-count { position: absolute; left: 0; right: 0; top: 30vh; text-align: center; z-index: 7; font-size: clamp(5rem, 22vh, 12rem); font-weight: 800; animation: c-count 1s both; text-shadow: 0 4px 30px rgb(0 0 0 / .5); }
+@keyframes c-count { 0% { opacity: 0; transform: scale(1.8); } 25% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(.8); } }
+.c-launching { animation: c-launch 15s both; }
+.c-launching .c-flame { opacity: 0; animation: c-ignite .4s 3s both, c-flicker .12s 3s infinite alternate; }
+@keyframes c-ignite { to { opacity: 1; } }
+@keyframes c-launch {
+  0%, 21% { transform: translateX(-50%); }
+  22% { transform: translateX(-49.5%); }
+  23% { transform: translateX(-50.5%); }
+  24% { transform: translateX(-50%); }
+  50% { transform: translateX(-50%) translateY(-34vh) scale(.72); }
+  68% { transform: translateX(10vw) translateY(-30vh) scale(.36) rotate(62deg); }
+  100% { transform: translateX(30vw) translateY(-16vh) scale(.2) rotate(84deg); }
+}
+.c-smoke { position: absolute; bottom: 15vh; width: 18vh; height: 18vh; margin-left: -9vh; border-radius: 50%; background: #e7ecf0; filter: blur(14px); z-index: 5; animation: c-smoke 3.6s both; }
+@keyframes c-smoke { from { opacity: 0; transform: scale(.2); } 25% { opacity: .95; } to { opacity: 0; transform: scale(3) translateY(-5vh); } }
+
+/* Reparatur */
+.c-shield { position: absolute; left: 50%; top: 56%; width: min(72vw, 92vh); transform: translate(-50%, -50%); z-index: 3; overflow: visible; }
+.c-piece { fill: #e0a43a; stroke: #0b1622; stroke-width: .04; animation: c-piece .7s cubic-bezier(.2, .8, .3, 1) both; }
+.c-piece:nth-child(3n) { fill: #4fb3a5; } .c-piece:nth-child(3n + 1) { fill: #8fa8e8; }
+@keyframes c-piece { from { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(18deg); } }
+.c-spark { position: absolute; left: 50%; top: 56%; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 0 34px 18px #ffc36b; z-index: 4; animation: c-weld 5.2s .4s both; }
+@keyframes c-weld { 0% { transform: translate(-30vw, -12vh); } 25% { transform: translate(14vw, 9vh); } 50% { transform: translate(-16vw, 8vh); } 75% { transform: translate(24vw, -10vh); } 96% { opacity: 1; } 100% { transform: translate(0, 0); opacity: 0; } }
+.c-sun { position: absolute; right: -24vh; top: 12vh; width: 48vh; height: 48vh; border-radius: 50%; background: radial-gradient(circle, #fff3b0, #ff9b3d 45%, transparent 70%); animation: c-sun 3.4s 7.4s ease-out both; }
+@keyframes c-sun { from { opacity: 0; transform: scale(.3); } to { transform: scale(1.5); } }
+
+/* Asteroiden */
+.c-weaving, .c-cruise, .c-drift { left: 26%; bottom: 40vh; height: 26vh; transform: translate(-50%, 50%) rotate(90deg); }
+.c-weaving { animation: c-weave 12s ease-in-out both; }
+@keyframes c-weave { 0% { transform: translate(-60vw, 50%) rotate(90deg); } 15% { transform: translate(-50%, 50%) rotate(90deg); } 30% { transform: translate(-50%, -8vh) rotate(78deg); } 46% { transform: translate(-50%, 22vh) rotate(102deg); } 62% { transform: translate(-50%, 50%) rotate(90deg); } 100% { transform: translate(70vw, 50%) rotate(90deg); } }
+.c-rock { position: absolute; left: 110%; border-radius: 46% 54% 58% 42% / 52% 44% 56% 48%; background: radial-gradient(circle at 35% 30%, #a08f7f, #4c4239 72%); z-index: 3; animation: c-rock linear infinite; }
+@keyframes c-rock { to { transform: translateX(-140vw) rotate(-360deg); } }
+.c-glitch { position: absolute; inset: 0; z-index: 6; opacity: 0; background: repeating-linear-gradient(#fff 0 2px, transparent 2px 5px), #111; mix-blend-mode: screen; animation: c-glitch 1.4s 10.6s steps(6) both; }
+@keyframes c-glitch { 0% { opacity: 0; } 30% { opacity: .7; } 50% { opacity: .2; } 100% { opacity: .95; } }
+
+/* Funk */
+.c-cruise { animation: c-bob 5s ease-in-out infinite alternate; }
+@keyframes c-bob { to { transform: translate(-50%, calc(50% - 16px)) rotate(90deg); } }
+.c-ring { position: absolute; left: 34%; top: 60%; width: 10vh; height: 10vh; margin: -5vh; border-radius: 50%; border: 3px solid #5be08a; z-index: 3; animation: c-ring 2.7s ease-out infinite; }
+@keyframes c-ring { from { opacity: 1; transform: scale(.3); } to { opacity: 0; transform: scale(9); } }
+.c-bars { position: absolute; right: 12vw; top: 46vh; width: min(30vw, 240px); height: 26vh; display: flex; gap: 10px; align-items: flex-end; z-index: 4; }
+.c-bars i { flex: 1; background: #5be08a; border-radius: 3px; animation: c-bar-up .4s both; box-shadow: 0 0 16px #5be08a; }
+@keyframes c-bar-up { from { opacity: .12; background: #33424f; box-shadow: none; } }
+
+/* Reaktor */
+.cut-reactor { background: radial-gradient(circle at 50% 62%, #1b1216, #03050c 70%); }
+.c-core { position: absolute; left: 50%; top: 62%; width: 34vh; height: 34vh; margin: -17vh; border-radius: 50%; animation: c-core 6s 1.4s both, c-pulse 1.1s ease-in-out infinite alternate; background: radial-gradient(circle, #fff, #ff6b4a 42%, transparent 70%); }
+@keyframes c-core { to { filter: hue-rotate(180deg) saturate(1.3); } }
+@keyframes c-pulse { to { transform: scale(1.1); } }
+.c-kw { position: absolute; left: 0; right: 0; top: 56vh; text-align: center; z-index: 5; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: clamp(2.4rem, 9vh, 5rem); font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 2px 16px #000; }
+
+/* Anflug */
+.c-mars { position: absolute; right: -8vw; bottom: -18vh; width: 90vh; height: 90vh; border-radius: 50%; background: radial-gradient(circle at 34% 30%, #f0a06c, #b4532f 52%, #4a1d13 82%); box-shadow: -8px -8px 70px rgb(240 130 80 / .5); transform-origin: 70% 70%; animation: c-mars 11s cubic-bezier(.3, 0, .4, 1) both; }
+@keyframes c-mars { from { transform: scale(.08); } }
+.c-approach { left: 28%; bottom: 34vh; height: 22vh; transform: rotate(100deg); animation: c-approach 11s ease-in-out both; }
+@keyframes c-approach { from { transform: translate(-30vw, -8vh) rotate(100deg) scale(1.2); } to { transform: translate(14vw, 8vh) rotate(112deg) scale(.5); } }
+
+/* Landung */
+.c-mars-sky { position: absolute; inset: 0; background: linear-gradient(#2a1420, #8a4a35 66%, #d9915f); animation: c-in 3s both; }
+.c-mars-ground { position: absolute; left: -5%; right: -5%; bottom: 0; height: 22vh; background: linear-gradient(#a8552f, #5e2a18); border-radius: 50% 50% 0 0 / 18% 18% 0 0; z-index: 3; animation: c-rise 8.6s ease-out both; }
+.c-mars-ground.still { animation: none; }
+@keyframes c-rise { from { transform: translateY(100%); } }
+.c-descent { bottom: 18vh; height: 34vh; animation: c-descent 8.6s cubic-bezier(.2, .6, .35, 1) both; }
+@keyframes c-descent { from { transform: translateX(-50%) translateY(-110vh); } }
+.c-descent .c-flame { animation: c-flicker .12s infinite alternate, c-fade .5s 8.5s both; }
+.c-dust { position: absolute; bottom: 15vh; width: 16vh; height: 12vh; margin-left: -8vh; border-radius: 50%; background: #d9a07a; filter: blur(12px); z-index: 5; animation: c-smoke 3s both; }
+.c-confetti { position: absolute; top: -14px; width: 9px; height: 15px; z-index: 6; animation: c-confetti 4s linear both; }
+@keyframes c-confetti { to { transform: translateY(106vh) rotate(720deg); } }
+
+/* Gefahr */
+.c-alarm { position: absolute; inset: 0; background: #d0281c; animation: c-alarm 1.1s ease-in-out infinite alternate; }
+@keyframes c-alarm { from { opacity: .06; } to { opacity: .34; } }
+.c-drift { left: 50%; bottom: 26vh; animation: c-tumble 9s ease-in-out both; }
+@keyframes c-tumble { from { transform: translate(-70%, 40%) rotate(70deg); } to { transform: translate(-30%, 60%) rotate(128deg); } }
+
+/* Abspann */
+.c-landed { bottom: 17vh; height: 30vh; left: 18%; z-index: 4; }
+.c-credits { position: absolute; left: 50%; top: 100%; width: min(620px, calc(100vw - 32px)); transform: translateX(-50%); text-align: center; z-index: 6; display: flex; flex-direction: column; gap: 26px; animation: c-roll linear both; text-shadow: 0 2px 12px #000; }
+.c-credits h2 { font-size: clamp(1.8rem, 5vw, 3rem); color: #ffd36b; margin: 0; }
+.c-credits p { margin: 0; }
+.c-credit strong { display: block; font-size: 1.35rem; }
+.c-credit span { color: #e6d5c5; }
+@keyframes c-roll { 88%, 100% { transform: translate(-50%, calc(-100% - 42vh)); } }
+
+@media (max-width: 620px) {
+  .c-weaving, .c-cruise { left: 34%; height: 18vh; }
+  .c-bars { right: 6vw; }
+  .c-ring { left: 44%; }
+  .c-landed { opacity: .3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cut, .cut *, .cut::before, .cut::after { animation-duration: .01s !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+  .c-credits { position: absolute; top: 12vh; transform: translateX(-50%); animation: none !important; }
+}

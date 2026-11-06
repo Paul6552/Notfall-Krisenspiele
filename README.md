@@ -22,6 +22,12 @@ Das Spiel läuft unter **https://paul6552.github.io/Notfall-Krisenspiele/**. Jed
 4. **Spielleiter:** Rollen vergeben, festlegen, ob er selbst die Brücke spielt und ob der Chat im Spiel oder externe Tools genutzt werden. Dann die Übung starten.
 5. **Während der Übung:** Der Spielleiter schaltet Ereignisse per Knopf weiter. Timer sind nur Richtwerte.
 
+### Filme zwischen den Ereignissen
+
+Nach jedem „Weiter“ läuft bei allen gleichzeitig ein kurzer Film von 8 bis 18 Sekunden: vom Start der ARES 1 bis zur Landung auf dem Mars, am Schluss ein Abspann mit allen Organisationen. Der Ausgang hängt vom Spielverlauf ab, zum Beispiel „Erfolgreich gestartet“ oder „Gestartet mit Verspätung“.
+
+Die Filme sind im Browser animiert und brauchen keine Videodateien. Jede Person kann sie für sich überspringen. Die Spielleitung kann sie in der Lobby abschalten.
+
 ### Wenn der Spielleiter-Browser zugeht
 
 Der Browser des Spielleiters hält den Spielstand und speichert jede Änderung sofort in der IndexedDB. Beim Schließen fragt er nach.
@@ -53,6 +59,8 @@ Die Zugangsdaten stehen danach im ausgelieferten JavaScript. Nutzt deshalb zeitl
 Alle Texte, Rätsel, die Karte, die Geräte und die Sprüche für Ereignis 6 stehen in `src/game/content/flugZumMars.ts`. Nach Änderungen an Rätseln `npm test` ausführen. Die Tests prüfen unter anderem, ob die Karte einen sicheren Weg hat und die Summen stimmen.
 
 Sektoren-Codes stehen in `SECTOR_CODES` und müssen zu den Fragmenten in `E7_FRAGMENTS` passen.
+
+Die Texte der Filme stehen in `src/game/content/cutscenes.ts`, die Szenen in `src/ship/Cutscene.tsx` und `src/ship/cutscene.css`.
 
 ## Tests
 

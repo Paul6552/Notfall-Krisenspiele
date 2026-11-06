@@ -21,6 +21,22 @@ export interface Settings {
   /** ingame: Chat im Spiel erzwingt die Regeln. external: Kommunikation über externe Tools. */
   comm: 'ingame' | 'external'
   restartSeconds: number
+  /** Filme zwischen den Ereignissen. */
+  cutscenes: boolean
+}
+
+export type CutsceneScene = 'intro' | 'prep' | 'launch' | 'repair' | 'asteroids' | 'signal' | 'reactor' | 'restart' | 'landing' | 'failure' | 'credits'
+
+export interface Cutscene {
+  id: number
+  scene: CutsceneScene
+  title: string
+  subtitle: string
+  tone: 'good' | 'warn' | 'bad'
+  at: number
+  seconds: number
+  /** Reaktorlast für die Szene „reactor“. */
+  kw?: number
 }
 
 export interface ChatMsg {
@@ -82,6 +98,7 @@ export interface GameState {
   hostSeenAt?: number
   ship: ShipStatus
   failure: string | null
+  cutscene: Cutscene | null
   chat: ChatMsg[]
   nextMsgId: number
   log: LogEntry[]

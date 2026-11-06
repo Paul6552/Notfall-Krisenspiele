@@ -14,6 +14,13 @@ export const GAME = {
     'Die ARES 1 bricht zum Mars auf. Hüllenschaden, Ionensturm, Systemausfall, Reaktorüberlastung und Desinformation fordern den Stab. Nur wenn alle Sektionen ihre Informationen teilen, gelingt die Landung.',
   minTeams: 2,
   maxTeams: 7,
+  trains: [
+    'Kommunikation zwischen den Teams',
+    'Zusammenarbeit trotz lokaler eigener Interessen',
+    'Organisationen sollen gestresst werden → Zeitdruck',
+    'Kommunikationswechsel: Die Standardkommunikation fällt aus, es muss ein neuer Weg gefunden werden zu kommunizieren',
+    'Desinformationskampagnen ausstehen',
+  ],
 }
 
 export const ROLES: Record<RoleId, { code: string; section: string; skkm: string; game: string; skkmText: string }> = {

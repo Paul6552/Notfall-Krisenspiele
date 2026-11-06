@@ -65,6 +65,10 @@ export function Lobby({ state, act, onError, setHostTeam }: {
             <label className="radio"><input type="radio" name="comm" checked={state.settings.comm === 'ingame'} onChange={() => act({ type: 'setSettings', settings: { comm: 'ingame' } })} /> Chat im Spiel, das Spiel erzwingt die Regeln</label>
             <label className="radio"><input type="radio" name="comm" checked={state.settings.comm === 'external'} onChange={() => act({ type: 'setSettings', settings: { comm: 'external' } })} /> Externe Tools, zum Beispiel MS Teams und Mattermost</label>
           </fieldset>
+          <fieldset>
+            <legend>Erlebnis</legend>
+            <label className="radio"><input type="checkbox" checked={state.settings.cutscenes !== false} onChange={(e) => act({ type: 'setSettings', settings: { cutscenes: e.target.checked } })} /> Filme zwischen den Ereignissen zeigen</label>
+          </fieldset>
         </section>
 
         <section className="card">
