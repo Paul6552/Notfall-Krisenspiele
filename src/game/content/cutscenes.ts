@@ -48,5 +48,5 @@ function script(from: Phase, s: GameState, kw: number): Script | null {
 
 export function cutsceneFor(from: Phase, s: GameState, kw: number, at: number, id: number): Cutscene | null {
   const part = script(from, s, kw)
-  return part && { ...part, id, at, seconds: SECONDS[part.scene] }
+  return part && { ...part, id, at, seconds: SECONDS[part.scene], released: false }
 }

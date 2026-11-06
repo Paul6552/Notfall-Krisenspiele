@@ -256,26 +256,38 @@ for (const n of [2, 6, 7]) {
 test('Filme laufen bei allen gleichzeitig und hängen vom Spielverlauf ab', async ({ context }) => {
   const { host, teams, as } = await setup(context, 2, true)
   const film = teams[1].getByTestId('cutscene')
+  const release = async () => {
+    await host.getByRole('button', { name: /Weiter für alle/ }).click()
+    for (const p of [host, ...teams]) await expect(p.getByTestId('cutscene')).toHaveCount(0)
+  }
   await expect(film).toContainText('Mission Red Planet')
   await expect(host.getByTestId('cutscene')).toBeVisible()
   await teams[1].getByRole('button', { name: 'Überspringen' }).click()
-  await expect(film).toHaveCount(0)
-  await expect(host.getByTestId('cutscene')).toBeVisible() // Überspringen gilt nur für das eigene Team
+  // Überspringen führt nur zum Standbild und gilt nur für das eigene Team
+  await expect(teams[1].getByTestId('cutscene-wait')).toContainText('Spielleitung gibt gleich')
+  await expect(host.getByRole('button', { name: 'Überspringen' })).toBeVisible()
+  await expect(teams[1].getByRole('button', { name: /Weiter für alle/ })).toHaveCount(0)
   await host.getByRole('button', { name: 'Überspringen' }).click()
-  await teams[0].getByRole('button', { name: 'Überspringen' }).click()
+  await release()
 
   await advance(host)
-  for (const p of [host, ...teams]) await p.getByRole('button', { name: 'Überspringen' }).click()
+  await host.getByRole('button', { name: 'Überspringen' }).click()
+  await release()
   const bridge = await as('LS')
   await bridge.getByRole('button', { name: /GO für den Start/ }).click()
   await advance(host)
   await expect(film).toContainText('Erfolgreich gestartet')
   await expect(teams[0].getByTestId('cutscene')).toContainText('auf dem Weg zum Mars')
 
-  // Neuladen während des Films: läuft weiter, danach ist die Oberfläche wieder bedienbar
+  // Neuladen während des Films: läuft weiter und bleibt am Ende stehen, bis die Spielleitung freigibt
   await teams[1].reload()
   await expect(film).toBeVisible()
-  await expect(film).toHaveCount(0, { timeout: 20_000 })
+  await expect(teams[1].getByTestId('cutscene-wait')).toBeVisible({ timeout: 20_000 })
+  await expect(film).toContainText('Erfolgreich gestartet')
+  await expect(host.getByRole('button', { name: /Weiter für alle – .*Hüllenschaden/ })).toBeVisible()
+  await teams[1].waitForTimeout(1500)
+  await expect(film).toBeVisible()
+  await release()
   await expect(teams[1].getByTestId('phase-title')).toHaveText(/Ereignis 2/)
 })
 

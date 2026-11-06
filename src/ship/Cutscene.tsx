@@ -39,7 +39,7 @@ const ASTEROIDS = [
   [12, 0, 9, 70], [32, 2.2, 7, 110], [58, 1, 8, 54], [76, 3.1, 6.5, 90], [22, 4.4, 7.5, 60], [66, 5, 8.5, 80], [46, 6, 6, 120], [86, 0.6, 9, 50],
 ]
 
-function ReactorCounter({ kw }: { kw: number }) {
+function ReactorCounter({ kw, held }: { kw: number; held: boolean }) {
   const [value, setValue] = useState(E5_START_KW)
   useEffect(() => {
     const start = performance.now() + 1500
@@ -52,7 +52,7 @@ function ReactorCounter({ kw }: { kw: number }) {
     frame = requestAnimationFrame(step)
     return () => cancelAnimationFrame(frame)
   }, [kw])
-  return <div className="c-kw">{value} kW</div>
+  return <div className="c-kw">{held ? kw : value} kW</div>
 }
 
 function Credits({ teams, roleOwner, title, subtitle, seconds }: Props & { title: string; subtitle: string; seconds: number }) {
@@ -71,7 +71,7 @@ function Credits({ teams, roleOwner, title, subtitle, seconds }: Props & { title
   )
 }
 
-function Stage({ c, teams, roleOwner }: { c: Cutscene } & Props) {
+function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & Props) {
   const scenes: Record<CutsceneScene, React.ReactNode> = {
     intro: <><Pad /><div className="c-ship c-on-pad"><Rocket /></div></>,
     prep: (
@@ -122,7 +122,7 @@ function Stage({ c, teams, roleOwner }: { c: Cutscene } & Props) {
         <div className="c-bars">{[0, 1, 2, 3, 4].map((i) => <i key={i} style={{ height: `${20 + i * 18}%`, animationDelay: `${1.2 + i * 0.8}s` }} />)}</div>
       </>
     ),
-    reactor: <><div className="c-core" /><ReactorCounter kw={c.kw ?? 150} /></>,
+    reactor: <><div className="c-core" /><ReactorCounter kw={c.kw ?? 150} held={held} /></>,
     restart: (
       <>
         <Stars />
@@ -163,13 +163,23 @@ interface Props {
   roleOwner: Record<RoleId, string | null>
 }
 
-/** Zeigt den Film bei allen gleichzeitig. Wer später lädt, sieht ihn nur, solange er noch läuft. */
-export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0 }: Props & { cutscene: Cutscene | null; offset?: number }) {
+interface OverlayProps extends Props {
+  cutscene: Cutscene | null
+  offset?: number
+  /** Nur die Spielleitung bekommt den Knopf zur Freigabe. */
+  onRelease?: () => void
+  nextTitle?: string
+  hostLost?: boolean
+}
+
+/** Zeigt den Film bei allen gleichzeitig. Danach bleibt das Schlussbild stehen, bis die Spielleitung freigibt. */
+export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRelease, nextTitle, hostLost = false }: OverlayProps) {
   const [finished, setFinished] = useState(0)
   const skip = useRef<HTMLButtonElement>(null)
   const id = cutscene?.id ?? 0
   const expired = cutscene ? Date.now() + offset - cutscene.at >= cutscene.seconds * 1000 : true
-  const playing = Boolean(cutscene) && !expired && finished !== id
+  const active = Boolean(cutscene) && !cutscene?.released
+  const playing = active && !expired && finished !== id
 
   useEffect(() => {
     if (!playing || !cutscene) return
@@ -180,18 +190,25 @@ export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0 }: Prop
     return () => clearTimeout(timer)
   }, [playing, id, cutscene, offset])
 
-  if (!playing || !cutscene) return null
+  if (!active || !cutscene) return null
   const credits = cutscene.scene === 'credits'
   return (
-    <div className={`cut cut-${cutscene.scene}`} role="dialog" aria-label={`Film: ${cutscene.title}`} data-testid="cutscene">
-      <Stage c={cutscene} teams={teams} roleOwner={roleOwner} />
+    <div className={`cut cut-${cutscene.scene}${playing ? '' : ' held'}`} role="dialog" aria-label={`Film: ${cutscene.title}`} data-testid="cutscene">
+      <Stage c={cutscene} teams={teams} roleOwner={roleOwner} held={!playing} />
       {!credits && (
         <div className={`c-caption ${cutscene.tone}`} style={{ animationDelay: `${CAPTION_AT[cutscene.scene]}s` }}>
           <h1>{cutscene.title}</h1>
           <p>{cutscene.subtitle}</p>
         </div>
       )}
-      <button ref={skip} className="c-skip" onClick={() => setFinished(id)}>Überspringen</button>
+      {playing && <button ref={skip} className="c-skip" onClick={() => setFinished(id)}>Überspringen</button>}
+      {!playing && (
+        <div className="c-wait" data-testid="cutscene-wait">
+          {onRelease
+            ? <button className="btn primary" onClick={onRelease}>Weiter für alle – {nextTitle}</button>
+            : <p role="status">{hostLost ? 'Die Verbindung zur Spielleitung ist unterbrochen. Es geht weiter, sobald sie zurück ist.' : 'Die Spielleitung gibt gleich den nächsten Abschnitt frei.'}</p>}
+        </div>
+      )}
     </div>
   )
 }

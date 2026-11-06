@@ -37,6 +37,8 @@ export interface Cutscene {
   seconds: number
   /** Reaktorlast für die Szene „reactor“. */
   kw?: number
+  /** Erst die Spielleitung gibt das nächste Ereignis frei. */
+  released: boolean
 }
 
 export interface ChatMsg {
@@ -174,6 +176,7 @@ export type Action =
   | { type: 'addSlot'; name: string }
   | { type: 'removeTeam'; teamId: string }
   | { type: 'advance' }
+  | { type: 'releaseCutscene' }
   | { type: 'pause' }
   | { type: 'resume' }
   | { type: 'adjustShip'; key: keyof ShipStatus; delta: number }

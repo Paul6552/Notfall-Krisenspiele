@@ -7,12 +7,12 @@ import { isEmojiOnly } from '../src/game/emoji'
 import { CM_PER_UNIT, FRAME_H, FRAME_W, piecePolygon, polygonArea, shieldCoverage } from '../src/game/geometry'
 import { project } from '../src/game/projection'
 import { advanceWarnings, canStart, createGame, joinTeam, makeGameCode, pauseAfterHostReturn, reduce, setHostTeam, tick, totalKw } from '../src/game/reducer'
-import { GM, ROLE_IDS } from '../src/game/types'
+import { ALL, GM, RuleError, ROLE_IDS } from '../src/game/types'
 import type { Action, GameState, PieceKind, Placement } from '../src/game/types'
 import { solveShield } from './solveShield'
 
-function setup(teams: number) {
-  let s = createGame({ code: 'ARES-TEST01', teamCount: teams, now: 0 })
+function setup(teams: number, cutscenes = false) {
+  let s = createGame({ code: 'ARES-TEST01', teamCount: teams, now: 0, settings: { cutscenes } })
   for (let i = 0; i < teams; i++) s = joinTeam(s, { name: `Org ${i}` }).state
   s = reduce(s, { type: 'autoAssign' }, GM, 0)
   return s
@@ -272,6 +272,7 @@ describe('Landung', () => {
 describe('Filme', () => {
   it('Start zeigt je nach Entscheidung den passenden Ausgang', () => {
     let s = toPhase(setup(7), 'e1')
+    s = { ...s, settings: { ...s.settings, cutscenes: true } }
     const late = reduce(s, { type: 'advance' }, GM, 9)
     expect(late.cutscene).toMatchObject({ scene: 'launch', title: 'Gestartet mit Verspätung', tone: 'warn' })
     s = reduce(s, { type: 'e1Decide', go: true }, owner(s, 'LS'), 5)
@@ -279,7 +280,7 @@ describe('Filme', () => {
     expect(reduce(s, { type: 'advance' }, GM, 9).cutscene).toMatchObject({ scene: 'launch', title: 'Erfolgreich gestartet', tone: 'good' })
   })
   it('jeder Übergang hat einen Film, nummeriert und zeitgestempelt', () => {
-    let s = setup(7)
+    let s = setup(7, true)
     s = { ...s, e5: { ...s.e5, off: DEVICES.filter((d) => !['cooling', 'oxygen', 'hydro'].includes(d.id)).map((d) => d.id) } }
     const seen: (string | undefined)[] = []
     for (let t = 1; s.phase !== 'done'; t++) {
@@ -288,6 +289,7 @@ describe('Filme', () => {
       seen.push(s.cutscene?.scene)
       expect(s.cutscene!.id).toBe(t)
       expect(s.cutscene!.at).toBe(t * 1000)
+      s = reduce(s, { type: 'releaseCutscene' }, GM, t * 1000)
     }
     expect(seen).toContain('reactor')
     expect(seen.at(-1)).toBe('credits')
@@ -295,13 +297,34 @@ describe('Filme', () => {
   })
   it('Reaktor nennt die erreichte Last, Scheitern zeigt den Gefahrenfilm', () => {
     let s = toPhase(setup(7), 'e5')
+    s = { ...s, settings: { ...s.settings, cutscenes: true } }
     const fail = reduce(s, { type: 'advance' }, GM, 9)
     expect(fail.cutscene).toMatchObject({ scene: 'failure', tone: 'bad' })
     for (const d of DEVICES.filter((x) => !['cooling', 'oxygen', 'hydro'].includes(x.id))) s = reduce(s, { type: 'e5Toggle', device: d.id }, owner(s, 'LS'), 5)
     expect(reduce(s, { type: 'advance' }, GM, 9).cutscene).toMatchObject({ scene: 'reactor', kw: 135 })
   })
+  it('nach dem Film geht es erst weiter, wenn die Spielleitung freigibt', () => {
+    let s = reduce(setup(2, true), { type: 'advance' }, GM, 1000)
+    const team = s.teams[0].id
+    expect(() => reduce(s, { type: 'chat', to: ALL, text: 'Hallo' }, team, 2000)).toThrow(RuleError)
+    expect(() => reduce(s, { type: 'releaseCutscene' }, team, 2000)).toThrow(RuleError)
+    expect(() => reduce(s, { type: 'advance' }, GM, 2000)).toThrow(RuleError)
+
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 60_000)
+    expect(s.cutscene!.released).toBe(true)
+    expect(s.phaseStartedAt).toBe(60_000) // Die Wartezeit zählt nicht zum Ereignis
+    expect(reduce(s, { type: 'advance' }, GM, 61_000).cutscene).toMatchObject({ id: 2, released: false })
+  })
+  it('Freigabe in einer Pause lässt die Uhr des Ereignisses bei null beginnen', () => {
+    let s = reduce(setup(2, true), { type: 'advance' }, GM, 1000)
+    s = reduce(s, { type: 'pause' }, GM, 2000)
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 50_000)
+    s = reduce(s, { type: 'resume' }, GM, 70_000)
+    expect(s.pausedAt).toBeNull()
+    expect(70_000 - s.phaseStartedAt - s.pausedMs).toBe(0)
+  })
   it('lassen sich abschalten', () => {
-    let s = setup(2)
+    let s = setup(2, true)
     s = reduce(s, { type: 'setSettings', settings: { cutscenes: false } }, GM, 0)
     expect(reduce(s, { type: 'advance' }, GM, 1).cutscene).toBeNull()
   })

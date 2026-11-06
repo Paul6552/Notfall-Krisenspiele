@@ -312,6 +312,8 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
   const s = structuredClone(state)
   const gm = actor === GM
   if (s.pausedAt && !gm && action.type !== 'chat') throw new RuleError('Die Übung ist pausiert.')
+  const held = Boolean(s.cutscene && !s.cutscene.released)
+  if (held && !gm) throw new RuleError('Die Spielleitung gibt das nächste Ereignis gleich frei.')
 
   switch (action.type) {
     case 'setSettings': {
@@ -364,6 +366,7 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
       break
     case 'advance': {
       needGm(actor)
+      if (held) throw new RuleError('Zuerst muss das aktuelle Ereignis freigegeben werden.')
       const idx = PHASES.indexOf(s.phase)
       if (s.phase === 'done') throw new RuleError('Die Übung ist beendet.')
       if (s.phase === 'lobby') {
@@ -378,6 +381,15 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
       log(s, now, `Phase gestartet.`, 'info')
       break
     }
+    case 'releaseCutscene':
+      needGm(actor)
+      if (!s.cutscene || !held) break
+      s.cutscene.released = true
+      // Die Uhr des Ereignisses läuft erst ab der Freigabe.
+      s.phaseStartedAt = now
+      s.pausedMs = 0
+      if (s.pausedAt) s.pausedAt = now
+      break
     case 'pause':
       needGm(actor)
       if (!s.pausedAt) s.pausedAt = now

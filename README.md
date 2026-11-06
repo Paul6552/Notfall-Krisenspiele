@@ -26,7 +26,7 @@ Das Spiel läuft unter **https://paul6552.github.io/Notfall-Krisenspiele/**. Jed
 
 Nach jedem „Weiter“ läuft bei allen gleichzeitig ein kurzer Film von 8 bis 18 Sekunden: vom Start der ARES 1 bis zur Landung auf dem Mars, am Schluss ein Abspann mit allen Organisationen. Der Ausgang hängt vom Spielverlauf ab, zum Beispiel „Erfolgreich gestartet“ oder „Gestartet mit Verspätung“.
 
-Die Filme sind im Browser animiert und brauchen keine Videodateien. Jede Person kann sie für sich überspringen. Die Spielleitung kann sie in der Lobby abschalten.
+Die Filme sind im Browser animiert und brauchen keine Videodateien. Am Ende bleibt das Schlussbild stehen, bis die Spielleitung mit „Weiter für alle“ freigibt. Erst dann sehen alle das nächste Ereignis, und erst dann läuft dessen Uhr. Jede Person kann den Film für sich überspringen und landet dann ebenfalls beim Schlussbild. Die Spielleitung kann sie in der Lobby abschalten.
 
 ### Wenn der Spielleiter-Browser zugeht
 
