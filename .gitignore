@@ -1,0 +1,21 @@
+# Abhängigkeiten und Build
+node_modules
+dist
+*.local
+
+# Testergebnisse
+test-results
+playwright-report
+
+# Logs
+*.log
+
+# Editoren
+.idea/
+*.iml
+.vscode/*
+.DS_Store
+*.sw?
+
+# Internes Konzept mit Personen- und Organisationsnamen, bleibt lokal
+*.xlsx
