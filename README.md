@@ -12,7 +12,7 @@ npm run dev        # Entwicklung
 npm run build      # Statische Seite in dist/
 ```
 
-Für die Übung den Ordner `dist/` auf ein beliebiges statisches Hosting legen, zum Beispiel GitHub Pages oder Netlify. Alle Beteiligten brauchen dieselbe Adresse.
+Das Spiel läuft unter **https://paul6552.github.io/Notfall-Krisenspiele/**. Jeder Push auf `main` prüft die Tests und veröffentlicht die Seite neu (`.github/workflows/pages.yml`). Alle Beteiligten brauchen dieselbe Adresse.
 
 ## Ablauf einer Übung
 
@@ -52,6 +52,7 @@ Sektoren-Codes stehen in `SECTOR_CODES` und müssen zu den Fragmenten in `E7_FRA
 npm test                                   # Spiellogik
 npm run test:e2e                           # Kompletter Durchlauf im installierten Chrome
 REAL_NET=1 npm run test:e2e -- realNetwork # Echte WebRTC-Verbindung, braucht Internet
+BASE_URL=https://paul6552.github.io/Notfall-Krisenspiele/ REAL_NET=1 npm run test:e2e -- realNetwork # Gegen die Live-Seite
 ```
 
 Für Probeläufe auf einem Rechner: `?net=local` an die Adresse anhängen (`http://localhost:5173/?net=local#/`). Dann verbinden sich mehrere Tabs desselben Browsers ohne Internet.
