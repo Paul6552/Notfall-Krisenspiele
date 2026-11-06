@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties } from 'react'
-import { E5_START_KW, ROLES } from '../game/content/flugZumMars'
+import { E5_LIMIT_KW, E5_START_KW, ROLES } from '../game/content/flugZumMars'
 import { SHIELD_TARGET } from '../game/geometry'
 import { ROLE_IDS } from '../game/types'
 import type { Cutscene, CutsceneScene, RoleId } from '../game/types'
@@ -36,6 +36,8 @@ const Pad = () => (
 
 const Stars = () => <div className="c-stars" />
 
+const RISE_FROM_KW = 120
+
 const ASTEROIDS = [
   [12, 0, 9, 70], [32, 2.2, 7, 110], [58, 1, 8, 54], [76, 3.1, 6.5, 90], [22, 4.4, 7.5, 60], [66, 5, 8.5, 80], [46, 6, 6, 120], [86, 0.6, 9, 50],
 ]
@@ -48,6 +50,29 @@ const METEORS = Array.from({ length: 28 }, (_, i) => [
   20 + ((i * 17) % 34),
 ])
 const HITS = IMPACT_HITS
+
+/** Kreissegment für das Strahlenzeichen. */
+function sector(cx: number, cy: number, inner: number, outer: number, from: number, to: number) {
+  const at = (r: number, deg: number) => `${(cx + r * Math.cos((deg * Math.PI) / 180)).toFixed(2)} ${(cy + r * Math.sin((deg * Math.PI) / 180)).toFixed(2)}`
+  return `M${at(inner, from)} L${at(outer, from)} A${outer} ${outer} 0 0 1 ${at(outer, to)} L${at(inner, to)} A${inner} ${inner} 0 0 0 ${at(inner, from)}Z`
+}
+
+/** Last steigt im Film von 5 bis 13,5 Sekunden, passend zum Balken. */
+function RisingKw({ held }: { held: boolean }) {
+  const [value, setValue] = useState(RISE_FROM_KW)
+  useEffect(() => {
+    const start = performance.now() + 5000
+    let frame = 0
+    const step = (t: number) => {
+      const p = Math.min(1, Math.max(0, (t - start) / 8500))
+      setValue(Math.round(RISE_FROM_KW + (E5_START_KW - RISE_FROM_KW) * p ** 1.6))
+      if (p < 1) frame = requestAnimationFrame(step)
+    }
+    frame = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(frame)
+  }, [])
+  return <div className="c-kwrise">{held ? E5_START_KW : value} kW</div>
+}
 
 function ReactorCounter({ kw, held }: { kw: number; held: boolean }) {
   const [value, setValue] = useState(E5_START_KW)
@@ -196,6 +221,36 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
         <div className="c-bars">{[0, 1, 2, 3, 4].map((i) => <i key={i} style={{ height: `${20 + i * 18}%`, animationDelay: `${1.2 + i * 0.8}s` }} />)}</div>
       </>
     ),
+    overload: (
+      <>
+        <Stars />
+        <div className="c-ship c-rearfly"><Rocket flame /></div>
+        <div className="c-engine">
+          <div className="c-load">
+            <span>Reaktorlast</span>
+            <div className="c-loadbar"><i /><b style={{ left: `${(E5_LIMIT_KW / E5_START_KW) * 100}%` }}>Grenzwert {E5_LIMIT_KW} kW</b></div>
+          </div>
+          <div className="c-reactorroom">
+            <svg viewBox="0 0 400 240" aria-hidden>
+              <path d="M-900 60 H60 M340 60 H1300 M-900 190 H60 M340 190 H1300" stroke="#3a4753" strokeWidth="14" />
+              <rect x="60" y="14" width="280" height="212" rx="46" fill="#39454f" stroke="#6d7b89" strokeWidth="6" />
+              <rect x="96" y="50" width="208" height="142" rx="24" fill="#0b1622" />
+              <circle cx="200" cy="121" r="56" className="c-heat" />
+              {[122, 158, 232, 268].map((x) => <rect key={x} x={x} y="50" width="10" height="86" fill="#6d7b89" />)}
+              <circle cx="200" cy="32" r="14" fill="#f2b544" />
+              {[-90, 30, 150].map((a) => <path key={a} d={sector(200, 32, 3.5, 12.5, a - 30, a + 30)} fill="#141a20" />)}
+              <text x="200" y="214" textAnchor="middle" fontSize="15" fontWeight="800" letterSpacing="3" fill="#dfe6ec">ATOMREAKTOR</text>
+            </svg>
+            <RisingKw held={held} />
+          </div>
+        </div>
+        <div className="c-reds" style={{ animationDelay: '13.5s' }}>
+          <i className="c-redglow" />
+          {['tl', 'tr', 'bl', 'br'].map((p) => <i key={p} className={`c-beacon ${p}`} />)}
+        </div>
+        <div className="c-msg c-alarmword c-alarmstay">ALARM</div>
+      </>
+    ),
     reactor: <><div className="c-core" /><ReactorCounter kw={c.kw ?? 150} held={held} /></>,
     restart: (
       <>
@@ -229,7 +284,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
 }
 
 const CAPTION_AT: Record<CutsceneScene, number> = {
-  intro: 2.5, prep: 3, launch: 19.1, impact: 16, repair: 6, asteroids: 7.5, dish: 10, signal: 5.5, reactor: 6, restart: 6, landing: 9.5, failure: 2.5, credits: 0,
+  intro: 2.5, prep: 3, launch: 19.1, impact: 16, repair: 6, asteroids: 7.5, dish: 10, signal: 5.5, overload: 17.4, reactor: 6, restart: 6, landing: 9.5, failure: 2.5, credits: 0,
 }
 
 interface Props {

@@ -17,7 +17,7 @@ const VOLUME = 0.7
 /** Obergrenze der Höhen je Film: Schrill darf es nur bei Alarm und Gefahr klingen. */
 const CALM_CUT_HZ = 1300
 const ALARM_CUT_HZ = 2600
-const ALARM_SCENES: ReadonlySet<Cutscene['scene']> = new Set(['impact', 'failure'])
+const ALARM_SCENES: ReadonlySet<Cutscene['scene']> = new Set(['impact', 'overload', 'failure'])
 const STORAGE_KEY = 'krisenuebung.stumm'
 
 const note = (semitonesFromA4: number) => 440 * 2 ** (semitonesFromA4 / 12)
@@ -242,6 +242,20 @@ export function scheduleFilm(
       ;[1.2, 2, 2.8, 3.6, 4.4].forEach((t, i) => tone(note(-9 + i * 2), t, 0.2, { type: 'triangle', vol: 0.1 }))
       pad([-21, -14, -9], 0, 5.5, 0.1)
       break
+    case 'overload': {
+      pad([-21, -14, -9], 0, 5, 0.12)
+      // Die Last steigt: Brummen wird höher, die Warntöne kommen immer schneller.
+      tone(55, 5, 8.5, { type: 'sawtooth', to: 165, vol: 0.13, attack: 1, release: 0.2 })
+      tone(110, 5, 8.5, { type: 'triangle', to: 330, vol: 0.1, attack: 1, release: 0.2 })
+      noise(5, 8.5, { freq: 180, to: 800, vol: 0.2, attack: 3, release: 0.2 })
+      for (let t = 5.4, step = 1; t < 13.3; t += step, step = Math.max(0.24, step * 0.86)) tone(294, t, 0.1, { type: 'triangle', vol: 0.09 })
+      thump(13.5, 0.7)
+      for (let t = 13.5; t < 19; t += 1.5) {
+        tone(330, t, 0.75, { type: 'sawtooth', to: 520, vol: 0.075, release: 0.03 })
+        tone(520, t + 0.75, 0.75, { type: 'sawtooth', to: 330, vol: 0.075, release: 0.03 })
+      }
+      break
+    }
     case 'reactor':
       tone(160, 0, 5.8, { type: 'sawtooth', to: 55, vol: 0.09, attack: 0.5, release: 1 })
       tone(320, 0, 5.8, { type: 'triangle', to: 110, vol: 0.07, attack: 0.5, release: 1 })

@@ -355,7 +355,8 @@ describe('Filme', () => {
     }
     expect(seen).toContain('reactor')
     expect(seen.at(-1)).toBe('credits')
-    expect(seen).toHaveLength(12)
+    expect(seen).toHaveLength(13)
+    expect(seen.indexOf('overload')).toBe(seen.indexOf('signal') + 1)
     expect(seen.indexOf('dish')).toBe(seen.indexOf('asteroids') + 1)
     expect(seen.indexOf('impact')).toBe(seen.indexOf('launch') + 1)
   })
@@ -400,6 +401,18 @@ describe('Filme', () => {
     expect(s.cutscene).toMatchObject({ scene: 'dish', title: 'Kommunikationskanal ausgefallen', tone: 'bad', released: false })
     s = reduce(s, { type: 'releaseCutscene' }, GM, 50_000)
     expect(s.cutscene).toMatchObject({ scene: 'dish', released: true })
+    expect(s.phaseStartedAt).toBe(50_000)
+  })
+  it('vor Ereignis 5 steigt der Reaktor, erst die zweite Freigabe öffnet das Ereignis', () => {
+    let s = toPhase(setup(3), 'e4')
+    s = { ...s, settings: { ...s.settings, cutscenes: true } }
+    s = reduce(s, { type: 'advance' }, GM, 1000)
+    expect(s.cutscene).toMatchObject({ scene: 'signal' })
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 20_000)
+    expect(s.phase).toBe('e5')
+    expect(s.cutscene).toMatchObject({ scene: 'overload', title: 'Atomreaktor kurz vor der Explosion!', subtitle: 'Stromverbrauch muss sofort reduziert werden', tone: 'bad', released: false })
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 50_000)
+    expect(s.cutscene).toMatchObject({ scene: 'overload', released: true })
     expect(s.phaseStartedAt).toBe(50_000)
   })
   it('Freigabe in einer Pause lässt die Uhr des Ereignisses bei null beginnen', () => {
