@@ -266,6 +266,16 @@ export function scheduleFilm(
       pad([-21, -9, -5, 0], 0, 6, 0.12)
       pad([-16, -4, 0, 3], 4, 5, 0.12)
       break
+    case 'bridge':
+      pad([-21, -14, -9], 0, 4.8, 0.12)
+      pad([-33, -32, -26], 4.6, 13, 0.3)
+      // Herzschlag, der immer schneller wird, dazu die Warnung der Anzeigen.
+      for (let t = 5, step = 1.1; t < 17; t += step, step = Math.max(0.55, step * 0.95)) {
+        timpani(t, 0.24)
+        timpani(t + 0.2, 0.15)
+      }
+      for (let t = 5.4; t < 12; t += 1.6) tone(294, t, 0.18, { type: 'triangle', vol: 0.08 })
+      break
     case 'landing':
       noise(0, 8.6, { freq: 700, to: 180, vol: 0.34, attack: 1, release: 0.2 })
       tone(90, 0, 8.6, { type: 'sawtooth', to: 40, vol: 0.12, attack: 1, release: 0.2 })

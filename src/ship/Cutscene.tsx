@@ -74,6 +74,24 @@ function RisingKw({ held }: { held: boolean }) {
   return <div className="c-kwrise">{held ? E5_START_KW : value} kW</div>
 }
 
+/** Crewmitglied von hinten, mit Blick zum Fenster. */
+function CrewMember({ x, shirt, className, arms = false }: { x: number; shirt: string; className: string; arms?: boolean }) {
+  return (
+    <g transform={`translate(${x} 0)`}>
+      <g className={className}>
+        <path d="M-34 360 V286 Q-34 256 0 256 Q34 256 34 286 V360 Z" fill={shirt} />
+        {arms
+          ? <path className="c-arms" d="M-30 276 L-44 228 L-20 212 M30 276 L44 228 L20 212" fill="none" stroke={shirt} strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" />
+          : <path d="M-30 276 L-40 330 M30 276 L40 330" fill="none" stroke={shirt} strokeWidth="13" strokeLinecap="round" />}
+        <g className="c-head">
+          <circle cy="230" r="24" fill="#e0b08c" />
+          <path d="M-24 228 A24 24 0 0 1 24 228 Q0 216 -24 228Z" fill="#3a2a22" />
+        </g>
+      </g>
+    </g>
+  )
+}
+
 function ReactorCounter({ kw, held }: { kw: number; held: boolean }) {
   const [value, setValue] = useState(E5_START_KW)
   useEffect(() => {
@@ -150,7 +168,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
         </div>
         <div className="c-msg c-alarmword">ALARM</div>
         <div className="c-msg c-ahead">METEORITEN VORAUS</div>
-        <div className="c-msg c-hold"><strong>Ausweichen unmöglich.</strong><span>Wir können nichts tun. Durchhaltet!</span></div>
+        <div className="c-msg c-hold"><strong>Ausweichen unmöglich.</strong><span>Wir können nichts tun. DURCHHALTEN!</span></div>
       </>
     ),
     repair: (
@@ -259,6 +277,40 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
         <div className="c-ship c-approach"><Rocket flame /></div>
       </>
     ),
+    bridge: (
+      <>
+        <Stars />
+        <div className="c-ship c-portfly"><Rocket flame /></div>
+        <div className="c-deck">
+          <div className="c-bubble left">Wo bleibt der Algorithmus?</div>
+          <div className="c-bubble right">Der Mars kommt immer näher!</div>
+          <svg viewBox="0 0 640 360" aria-hidden>
+            <defs>
+              <clipPath id="c-deckwindow"><path d="M120 16 H520 L566 176 H74 Z" /></clipPath>
+              <radialGradient id="c-deckmars" cx=".35" cy=".3"><stop offset="0" stopColor="#f0a06c" /><stop offset=".55" stopColor="#b4532f" /><stop offset="1" stopColor="#4a1d13" /></radialGradient>
+            </defs>
+            <path d="M120 16 H520 L566 176 H74 Z" fill="#050811" stroke="#6d7b89" strokeWidth="7" />
+            <g clipPath="url(#c-deckwindow)">
+              {[[170, 50], [250, 90], [300, 36], [420, 60], [480, 120], [150, 130], [360, 28]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="1.6" fill="#fff" />)}
+              <circle cx="320" cy="170" r="52" fill="url(#c-deckmars)" className="c-deckplanet" />
+            </g>
+            <path d="M-500 214 H1140 V900 H-500 Z" fill="#2c3844" />
+            <path d="M-500 214 H1140 V232 H-500 Z" fill="#46545f" />
+            {[[52, 'LANDECODE', '– – – – – –'], [255, 'ALGORITHMUS', 'FEHLT'], [458, 'MARS', 'KOLLISIONSKURS']].map(([x, top, text]) => (
+              <g key={x as number}>
+                <rect x={x as number} y="176" width="130" height="50" rx="5" fill="#0b1622" stroke="#6d7b89" strokeWidth="3" />
+                <text x={(x as number) + 65} y="195" textAnchor="middle" fontSize="11" fontWeight="700" fill="#cfd8e2">{top}</text>
+                <text x={(x as number) + 65} y="215" textAnchor="middle" fontSize="13" fontWeight="800" fill="#ff5a4d" className="c-deckalert">{text}</text>
+              </g>
+            ))}
+            <CrewMember x={218} shirt="#3f6fb5" className="c-look" />
+            <CrewMember x={422} shirt="#b5563f" className="c-panic" arms />
+            <CrewMember x={624} shirt="#3f8f6a" className="c-pace" />
+          </svg>
+        </div>
+        <div className="c-reds" style={{ animationDelay: '12s' }}><i className="c-redglow" /></div>
+      </>
+    ),
     landing: (
       <>
         <Stars />
@@ -284,7 +336,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
 }
 
 const CAPTION_AT: Record<CutsceneScene, number> = {
-  intro: 2.5, prep: 3, launch: 19.1, impact: 16, repair: 6, asteroids: 7.5, dish: 10, signal: 5.5, overload: 17.4, reactor: 6, restart: 6, landing: 9.5, failure: 2.5, credits: 0,
+  intro: 2.5, prep: 3, launch: 19.1, impact: 16, repair: 6, asteroids: 7.5, dish: 10, signal: 5.5, overload: 17.4, reactor: 6, restart: 6, bridge: 12.5, landing: 9.5, failure: 2.5, credits: 0,
 }
 
 interface Props {

@@ -198,6 +198,33 @@
 .c-approach { left: 28%; bottom: 34vh; height: 22vh; transform: rotate(100deg); animation: c-approach 11s ease-in-out both; }
 @keyframes c-approach { from { transform: translate(-30vw, -8vh) rotate(100deg) scale(1.2); } to { transform: translate(14vw, 8vh) rotate(112deg) scale(.5); } }
 
+/* Crew auf der Brücke */
+.c-portfly { left: 42%; bottom: 40vh; height: 26vh; animation: c-portfly 5s ease-in both; }
+@keyframes c-portfly {
+  0% { transform: translate(-70vw, 50%) rotate(90deg); }
+  26%, 50% { transform: translate(-50%, 50%) rotate(90deg); }
+  90% { transform: translate(calc(-50% + 8vw - 38vh), 50%) rotate(90deg) scale(8); opacity: 1; }
+  100% { transform: translate(calc(-50% + 8vw - 48vh), 50%) rotate(90deg) scale(10); opacity: 0; }
+}
+.c-deck { position: absolute; inset: 0; z-index: 4; opacity: 0; background: linear-gradient(#141c24, #1e2831 45%, #2c3844 62%); animation: c-closeup .6s 4.6s both; }
+.c-deck svg { position: absolute; left: 0; width: 100%; top: 32vh; height: 61vh; overflow: visible; }
+.c-deckplanet { transform-box: fill-box; transform-origin: center; animation: c-deckplanet 13s 4.6s ease-in both; }
+@keyframes c-deckplanet { to { transform: scale(3.1); } }
+.c-deckalert { animation: c-deckalert .8s steps(2) infinite; }
+@keyframes c-deckalert { 50% { opacity: .25; } }
+.c-look .c-head { animation: c-look 1.1s ease-in-out infinite alternate; }
+@keyframes c-look { from { transform: translateX(-7px); } to { transform: translateX(7px); } }
+.c-pace { animation: c-pace 2.2s ease-in-out infinite alternate; }
+@keyframes c-pace { from { transform: translateX(-46px); } to { transform: translateX(34px); } }
+.c-panic { animation: c-panic .32s ease-in-out infinite alternate; }
+@keyframes c-panic { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+.c-bubble { position: absolute; top: 14vh; max-width: min(46vw, 340px); padding: 10px 14px; border-radius: 12px; background: #f2f5f8; color: #141a20; font-weight: 700; font-size: clamp(.95rem, 2.4vw, 1.3rem); opacity: 0; z-index: 2; }
+.c-bubble.left { left: max(16px, 14vw); animation: c-show 3.2s 5.8s both; }
+.c-bubble.right { right: max(16px, 14vw); animation: c-show 3.2s 8.8s both; }
+.cut-bridge .c-caption h1 { font-size: clamp(1.5rem, 4.4vw, 2.8rem); }
+.cut-bridge .c-caption { top: 11vh; }
+.cut-bridge .c-caption p { font-weight: 700; color: #ffd36b; }
+
 /* Landung */
 .c-mars-sky { position: absolute; inset: 0; background: linear-gradient(#2a1420, #8a4a35 66%, #d9915f); animation: c-in 3s both; }
 .c-mars-ground { position: absolute; left: -5%; right: -5%; bottom: 0; height: 22vh; background: linear-gradient(#a8552f, #5e2a18); border-radius: 50% 50% 0 0 / 18% 18% 0 0; z-index: 3; animation: c-rise 8.6s ease-out both; }
