@@ -187,6 +187,15 @@ export function scheduleFilm(
       for (let t = 0.5; t < 7.5; t += 1) tone(392, t, 0.07, { type: 'triangle', vol: 0.05 })
       noise(1, 6, { filter: 'bandpass', freq: 900, vol: 0.03, attack: 1, release: 2 })
       break
+    case 'control':
+      pad([-33, -21, -14], 0, 10.8, 0.2)
+      // Funkton vor jeder Durchsage, darunter ein ruhiger Puls.
+      for (const t of [1.1, 5.9]) {
+        tone(392, t, 0.12, { vol: 0.09 })
+        noise(t + 0.12, 0.4, { filter: 'bandpass', freq: 700, vol: 0.03, release: 0.3 })
+      }
+      for (let t = 0.6; t < 10.8; t += 1.2) timpani(t, 0.14)
+      break
     case 'launch':
       // Jede Zahl des Countdowns bekommt einen Ton und einen immer stärkeren Paukenschlag.
       pad([-33, -26, -21], 0, 11.6, 0.3)
@@ -221,6 +230,25 @@ export function scheduleFilm(
         tone(note(-9 + (i % 7) * 2), 0.5 + i * 0.32, 0.1, { type: 'triangle', vol: 0.05 })
       }
       pad([-21, -14, -9], 0, 6, 0.1)
+      break
+    case 'storm': {
+      pad([-21, -14, -9], 0, 3.2, 0.12)
+      // Der Ausbruch rollt heran, dann knistert es auf der Hülle.
+      noise(2.6, 7.4, { freq: 160, to: 800, vol: 0.34, attack: 2, release: 3 })
+      tone(45, 2.6, 7.4, { type: 'sawtooth', to: 70, vol: 0.14, attack: 2, release: 3 })
+      for (const t of [4.9, 5.9, 7]) thump(t, 0.45)
+      for (let t = 4.9; t < 9.3; t += 0.23) noise(t, 0.05, { filter: 'bandpass', freq: 1000, q: 3, vol: 0.1 })
+      for (let t = 7.2; t < 11; t += 0.6) tone(note(-33), t, 0.34, { type: 'sawtooth', vol: 0.08 })
+      break
+    }
+    case 'servers':
+      // Ruhiges Brummen der Server, dann der Stromstoß und ein Rack nach dem anderen fällt aus.
+      tone(60, 0, 3, { type: 'triangle', vol: 0.14, attack: 0.4, release: 0.05 })
+      tone(120, 0, 3, { vol: 0.05, attack: 0.4, release: 0.05 })
+      thump(3, 0.7)
+      noise(3, 0.9, { freq: 900, to: 160, vol: 0.26, release: 0.7 })
+      ;[-9, -12, -16, -19, -24].forEach((s, i) => tone(note(s), 3.4 + i * 0.45, 0.32, { type: 'triangle', vol: 0.12 }))
+      for (let t = 3.3; t < 8.3; t += 0.37) noise(t, 0.05, { filter: 'bandpass', freq: 1000, q: 3, vol: 0.08 })
       break
     case 'asteroids':
       for (let t = 0.2; t < 10.4; t += 0.6) tone(note(-33), t, 0.34, { type: 'sawtooth', vol: 0.09 })

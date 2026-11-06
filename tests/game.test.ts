@@ -347,15 +347,18 @@ describe('Filme', () => {
       expect(s.cutscene!.at).toBe(t * 1000)
       const id = s.cutscene!.id
       s = reduce(s, { type: 'releaseCutscene' }, GM, t * 1000)
-      if (!s.cutscene!.released) {
+      for (let next = id + 1; !s.cutscene!.released; next++) {
         seen.push(s.cutscene!.scene)
-        expect(s.cutscene!.id).toBe(id + 1)
+        expect(s.cutscene!.id).toBe(next)
         s = reduce(s, { type: 'releaseCutscene' }, GM, t * 1000)
       }
     }
     expect(seen).toContain('reactor')
     expect(seen.at(-1)).toBe('credits')
-    expect(seen).toHaveLength(14)
+    expect(seen).toHaveLength(17)
+    expect(seen.indexOf('servers')).toBe(seen.indexOf('storm') + 1)
+    expect(seen.indexOf('storm')).toBe(seen.indexOf('repair') + 1)
+    expect(seen.indexOf('control')).toBe(seen.indexOf('prep') + 1)
     expect(seen.indexOf('bridge')).toBe(seen.indexOf('restart') + 1)
     expect(seen.indexOf('overload')).toBe(seen.indexOf('signal') + 1)
     expect(seen.indexOf('dish')).toBe(seen.indexOf('asteroids') + 1)
@@ -428,6 +431,34 @@ describe('Filme', () => {
     s = reduce(s, { type: 'releaseCutscene' }, GM, 50_000)
     expect(s.cutscene).toMatchObject({ scene: 'bridge', released: true })
     expect(s.phaseStartedAt).toBe(50_000)
+  })
+  it('vor Ereignis 1 meldet sich die Flugkontrolle, erst die zweite Freigabe öffnet das Ereignis', () => {
+    let s = toPhase(setup(3), 'checkin')
+    s = { ...s, settings: { ...s.settings, cutscenes: true } }
+    s = reduce(s, { type: 'advance' }, GM, 1000)
+    expect(s.cutscene).toMatchObject({ scene: 'prep' })
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 10_000)
+    expect(s.phase).toBe('e1')
+    expect(s.cutscene).toMatchObject({ scene: 'control', title: 'GO oder NO-GO?', released: false })
+    expect(s.cutscene!.subtitle).toContain('Leiter der Brücke')
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 40_000)
+    expect(s.cutscene).toMatchObject({ scene: 'control', released: true })
+    expect(s.phaseStartedAt).toBe(40_000)
+  })
+  it('vor Ereignis 3 trifft der Ionensturm, erst die zweite Freigabe öffnet das Ereignis', () => {
+    let s = toPhase(setup(3), 'e2')
+    s = { ...s, settings: { ...s.settings, cutscenes: true } }
+    s = reduce(s, { type: 'advance' }, GM, 1000)
+    expect(s.cutscene).toMatchObject({ scene: 'repair' })
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 10_000)
+    expect(s.phase).toBe('e3')
+    expect(s.cutscene).toMatchObject({ scene: 'storm', title: 'Sonnen-Ionensturm!', tone: 'bad', released: false })
+    expect(s.cutscene!.subtitle).toContain('alle Teams')
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 40_000)
+    expect(s.cutscene).toMatchObject({ scene: 'servers', title: 'Kommunikationsserver beschädigt', tone: 'bad', released: false })
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 70_000)
+    expect(s.cutscene).toMatchObject({ scene: 'servers', released: true })
+    expect(s.phaseStartedAt).toBe(70_000)
   })
   it('Freigabe in einer Pause lässt die Uhr des Ereignisses bei null beginnen', () => {
     let s = reduce(setup(2, true), { type: 'advance' }, GM, 1000)

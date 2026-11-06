@@ -2,7 +2,7 @@
 import type { Cutscene, CutsceneScene, GameState, Phase } from '../types'
 
 const SECONDS: Record<CutsceneScene, number> = {
-  intro: 9, prep: 8, launch: 24, impact: 21, repair: 11, asteroids: 12, dish: 14, signal: 10, overload: 20, reactor: 11, restart: 11, bridge: 18, landing: 14, failure: 9, credits: 18,
+  intro: 9, prep: 8, control: 16, launch: 24, impact: 21, repair: 11, storm: 16, servers: 13, asteroids: 12, dish: 14, signal: 10, overload: 20, reactor: 11, restart: 11, bridge: 18, landing: 14, failure: 9, credits: 18,
 }
 
 type Script = Pick<Cutscene, 'scene' | 'title' | 'subtitle' | 'tone' | 'kw'>
@@ -47,9 +47,12 @@ function script(from: Phase, s: GameState, kw: number): Script | null {
 }
 
 const FOLLOW_UPS: Partial<Record<CutsceneScene, Script>> = {
+  prep: { scene: 'control', title: 'GO oder NO-GO?', subtitle: 'Leiter der Brücke: Meldet das Ergebnis der letzten Überprüfung an die Flugkontrolle.', tone: 'warn' },
   launch: { scene: 'impact', title: 'WIR SIND GETROFFEN – HÜLLENSCHADEN', subtitle: 'Wir brauchen umgehend Reparatur!', tone: 'bad' },
   signal: { scene: 'overload', title: 'Atomreaktor kurz vor der Explosion!', subtitle: 'Stromverbrauch muss sofort reduziert werden', tone: 'bad' },
   restart: { scene: 'bridge', title: 'Wir können ohne den richtigen Algorithmus nicht landen', subtitle: 'Wir brauchen diesen schnell, damit wir nicht auf dem Mars zerschellen!', tone: 'bad' },
+  repair: { scene: 'storm', title: 'Sonnen-Ionensturm!', subtitle: 'Wir brauchen alle Teams, um durch das Meteoritenfeld navigieren zu können.', tone: 'bad' },
+  storm: { scene: 'servers', title: 'Kommunikationsserver beschädigt', subtitle: 'Der Ionensturm hat die Server getroffen. Normale Nachrichten kommen nicht mehr durch.', tone: 'bad' },
   asteroids: { scene: 'dish', title: 'Kommunikationskanal ausgefallen', subtitle: 'Die Satellitenschüssel ist zerstört.', tone: 'bad' },
 }
 

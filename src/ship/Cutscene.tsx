@@ -38,6 +38,9 @@ const Stars = () => <div className="c-stars" />
 
 const RISE_FROM_KW = 120
 
+// Meteoritenfeld in der Ferne: Lage in Prozent, Größe in Pixeln
+const FAR_ROCKS = [[8, 18, 16], [32, 6, 10], [58, 22, 20], [84, 10, 12], [18, 44, 12], [46, 40, 24], [74, 48, 14], [6, 70, 20], [36, 66, 12], [62, 74, 18], [88, 66, 22], [24, 90, 14], [52, 94, 10], [78, 90, 16]]
+
 const ASTEROIDS = [
   [12, 0, 9, 70], [32, 2.2, 7, 110], [58, 1, 8, 54], [76, 3.1, 6.5, 90], [22, 4.4, 7.5, 60], [66, 5, 8.5, 80], [46, 6, 6, 120], [86, 0.6, 9, 50],
 ]
@@ -75,7 +78,7 @@ function RisingKw({ held }: { held: boolean }) {
 }
 
 /** Crewmitglied von hinten, mit Blick zum Fenster. */
-function CrewMember({ x, shirt, className, arms = false }: { x: number; shirt: string; className: string; arms?: boolean }) {
+function CrewMember({ x, shirt, className, arms = false, headset = false }: { x: number; shirt: string; className: string; arms?: boolean; headset?: boolean }) {
   return (
     <g transform={`translate(${x} 0)`}>
       <g className={className}>
@@ -86,6 +89,7 @@ function CrewMember({ x, shirt, className, arms = false }: { x: number; shirt: s
         <g className="c-head">
           <circle cy="230" r="24" fill="#e0b08c" />
           <path d="M-24 228 A24 24 0 0 1 24 228 Q0 216 -24 228Z" fill="#3a2a22" />
+          {headset && <path d="M-25 232 A25 25 0 0 1 25 232 M-25 226 V240 M25 226 V240" fill="none" stroke="#141a20" strokeWidth="4" />}
         </g>
       </g>
     </g>
@@ -139,6 +143,33 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
         <div className="c-clock">T − 30:00</div>
       </>
     ),
+    control: (
+      <div className="c-deck">
+        <div className="c-bubble left"><span aria-hidden>📡</span> Flugkontrolle an ARES 1: Die letzte Überprüfung vor dem Start muss durchgeführt werden.</div>
+        <div className="c-bubble right"><span aria-hidden>📡</span> Leiter der Brücke, meldet uns das Ergebnis. Wir brauchen ein GO oder NO-GO.</div>
+        <svg viewBox="0 0 640 360" aria-hidden>
+          <rect x="110" y="10" width="420" height="160" rx="6" fill="#071a1f" stroke="#6d7b89" strokeWidth="6" />
+          <path d="M130 150 H510 M130 110 H510 M130 70 H510 M210 30 V150 M320 30 V150 M430 30 V150" stroke="#14463f" strokeWidth="1.5" />
+          <path d="M214 148 V82 Q214 64 222 54 Q230 64 230 82 V148 Z" fill="#dfe6ec" />
+          <rect x="240" y="60" width="6" height="88" fill="#6d7b89" />
+          <text x="400" y="62" textAnchor="middle" fontSize="20" fontWeight="800" fill="#5be08a">ARES 1</text>
+          <text x="400" y="92" textAnchor="middle" fontSize="18" fontWeight="800" fill="#ffd36b" fontFamily="ui-monospace, monospace">T − 30:00</text>
+          <text x="400" y="122" textAnchor="middle" fontSize="13" fontWeight="800" fill="#ff8a6b" className="c-deckalert">LETZTE ÜBERPRÜFUNG</text>
+          <path d="M-500 214 H1140 V900 H-500 Z" fill="#2c3844" />
+          <path d="M-500 214 H1140 V232 H-500 Z" fill="#46545f" />
+          {[[52, 'TREIBSTOFF'], [255, 'WETTER'], [458, 'BRÜCKE']].map(([x, label]) => (
+            <g key={x as number}>
+              <rect x={x as number} y="176" width="130" height="50" rx="5" fill="#0b1622" stroke="#6d7b89" strokeWidth="3" />
+              <text x={(x as number) + 65} y="195" textAnchor="middle" fontSize="11" fontWeight="700" fill="#cfd8e2">{label}</text>
+              <text x={(x as number) + 65} y="215" textAnchor="middle" fontSize="13" fontWeight="800" fill="#ffd36b">WARTET</text>
+            </g>
+          ))}
+          <CrewMember x={44} shirt="#4a5a78" className="c-look" headset />
+          <CrewMember x={218} shirt="#3f6fb5" className="c-talk" headset />
+          <CrewMember x={422} shirt="#3f8f6a" className="c-look" headset />
+        </svg>
+      </div>
+    ),
     launch: (
       <>
         <Stars />
@@ -183,6 +214,48 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
         </svg>
         <i className="c-spark" />
       </>
+    ),
+    storm: (
+      <>
+        <Stars />
+        <div className="c-stormsun" />
+        {[3, 3.7, 4.4, 5.1, 5.8, 6.5, 7.2].map((t) => <i key={t} className="c-wave" style={{ animationDelay: `${t}s` }} />)}
+        {Array.from({ length: 26 }, (_, i) => <i key={i} className="c-ion" style={{ top: `${12 + ((i * 29) % 76)}%`, animationDelay: `${3.2 + i * 0.24}s` }} />)}
+        <div className="c-field">
+          {FAR_ROCKS.map(([x, y, size], i) => <i key={i} style={{ left: `${x}%`, top: `${y}%`, width: size, height: size }} />)}
+        </div>
+        <div className="c-ship c-stormship">
+          <Rocket flame />
+          <svg className="c-arcs" viewBox="0 0 80 240" aria-hidden>
+            <polyline points="22,50 34,70 18,92 36,118 20,140" />
+            <polyline points="60,70 46,92 62,120 44,146 60,170" />
+          </svg>
+        </div>
+        <i className="c-stormflash" />
+      </>
+    ),
+    servers: (
+      <div className="c-deck">
+        <svg viewBox="0 0 640 360" aria-hidden>
+          <path d="M-500 340 H1140 V900 H-500 Z" fill="#141a20" />
+          {[30, 150, 270, 390, 510].map((x, rack) => (
+            <g key={x}>
+              <rect x={x} y="20" width="100" height="320" rx="4" fill="#232d36" stroke="#46545f" strokeWidth="3" />
+              {Array.from({ length: 8 }, (_, row) => (
+                <g key={row}>
+                  <rect x={x + 10} y={32 + row * 37} width="80" height="28" rx="2" fill="#10161c" />
+                  {[0, 1, 2].map((led) => <circle key={led} cx={x + 22 + led * 12} cy={46 + row * 37} r="3.4" className="c-led" style={{ animationDelay: `${3.3 + rack * 0.45 + row * 0.05}s` }} />)}
+                  <rect x={x + 62} y={42 + row * 37} width="20" height="8" fill="#2c3844" />
+                </g>
+              ))}
+            </g>
+          ))}
+          <g className="c-serversparks">{[[176, 110], [320, 210], [438, 70], [556, 250]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="6" className="c-dishspark" style={{ animationDelay: '3.2s' }} />)}</g>
+          {[[176, 110], [438, 70]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="14" className="c-serversmoke" />)}
+        </svg>
+        <i className="c-stormflash" style={{ animationDelay: '3s' }} />
+        <div className="c-reds" style={{ animationDelay: '3.2s' }}><i className="c-redglow" /></div>
+      </div>
     ),
     asteroids: (
       <>
@@ -336,7 +409,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
 }
 
 const CAPTION_AT: Record<CutsceneScene, number> = {
-  intro: 2.5, prep: 3, launch: 19.1, impact: 16, repair: 6, asteroids: 7.5, dish: 10, signal: 5.5, overload: 17.4, reactor: 6, restart: 6, bridge: 12.5, landing: 9.5, failure: 2.5, credits: 0,
+  intro: 2.5, prep: 3, control: 11, launch: 19.1, impact: 16, repair: 6, storm: 11, servers: 8.5, asteroids: 7.5, dish: 10, signal: 5.5, overload: 17.4, reactor: 6, restart: 6, bridge: 12.5, landing: 9.5, failure: 2.5, credits: 0,
 }
 
 interface Props {

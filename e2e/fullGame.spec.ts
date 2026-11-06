@@ -272,6 +272,9 @@ test('Filme laufen bei allen gleichzeitig und hängen vom Spielverlauf ab', asyn
 
   await advance(host)
   await host.getByRole('button', { name: 'Überspringen' }).click()
+  await host.getByRole('button', { name: /Weiter für alle/ }).click()
+  await expect(film).toContainText('GO oder NO-GO?')
+  await host.getByRole('button', { name: 'Überspringen' }).click()
   await release()
   const bridge = await as('LS')
   await bridge.getByRole('button', { name: /GO für den Start/ }).click()
