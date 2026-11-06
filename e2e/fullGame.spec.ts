@@ -136,8 +136,10 @@ for (const n of [2, 6, 7]) {
     await expect(p.locator('.msg').last()).toContainText('🚀👍')
 
     // Spielstand übersteht das Neuladen von Spielleiter und Team
+    host.on('dialog', (d) => void d.accept())
     await host.reload()
     await expect(host.getByTestId('phase-title')).toHaveText(/Ereignis 3/)
+    await host.getByRole('button', { name: 'Fortsetzen' }).click()
     await teams[0].reload()
     await expect(teams[0].getByTestId('phase-title')).toHaveText(/Ereignis 3/)
     await expect(host.locator('.room .dot.on')).toHaveCount(n, { timeout: 15_000 })
@@ -244,6 +246,64 @@ for (const n of [2, 6, 7]) {
     expect(errors).toEqual([])
   })
 }
+
+test('Spielleiter schließt den Browser mitten im Reaktor-Neustart', async ({ context }) => {
+  const { host: first, teams, as, next } = await setup(context, 2)
+  for (const title of [/Ereignis 1/, /Ereignis 2/, /Ereignis 3/, /Ereignis 4/]) await next(title)
+  const bridge = await as('LS')
+  await bridge.getByRole('button', { name: 'Notkanal aktivieren' }).click()
+  await next(/Ereignis 5/)
+  await as('LS')
+  const keep = ['Hauptreaktor-Kühlung', 'Triebwerks-Vorwärmer', 'Hydrokulturen', 'Warmwasser']
+  for (const li of await bridge.locator('.devices li').all()) {
+    const text = (await li.textContent())!
+    const box = li.getByRole('checkbox')
+    if (!keep.some((k) => text.includes(k)) && (await box.isChecked())) { await box.click(); await expect(box).not.toBeChecked() }
+  }
+  await first.getByRole('button', { name: /^Weiter:/ }).click()
+  await expect(teams[0].getByTestId('phase-title')).toHaveText(/Ereignis 6/)
+  await first.getByLabel('Dauer des Neustarts').fill('8')
+  await (await as('LS')).getByRole('button', { name: 'Reaktor-Neustart einleiten' }).click()
+  await expect(first.getByText('Neustart: läuft')).toBeVisible()
+  const hull = await first.getByTestId('gauge-hull').textContent()
+
+  await first.close()
+  await expect(teams[0].getByText('Spielleitung getrennt')).toBeVisible({ timeout: 20_000 })
+  await expect(teams[0].locator('.timer')).toContainText('Pause')
+
+  // Länger weg, als der Neustart dauert
+  await teams[0].waitForTimeout(10_000)
+
+  const host = await context.newPage()
+  await host.goto(`${NET}#/`)
+  await host.getByRole('link', { name: 'Fortsetzen' }).first().click()
+  await expect(host.getByTestId('phase-title')).toHaveText(/Ereignis 6/)
+  await expect(host.getByTestId('gauge-hull')).toHaveText(hull!)
+  await expect(host.locator('.room .dot.on')).toHaveCount(2, { timeout: 15_000 })
+  await expect(host.getByText('Neustart: läuft')).toBeVisible()
+  await expect(teams[0].getByText('Spielleitung getrennt')).toHaveCount(0)
+  await expect(teams[0].getByText('Die Übung ist pausiert').first()).toBeVisible()
+
+  // Während der Pause ist nichts passiert, danach läuft die Restzeit
+  await host.waitForTimeout(2000)
+  await expect(host.getByText('Neustart: läuft')).toBeVisible()
+  await host.getByRole('button', { name: 'Fortsetzen' }).click()
+  await expect(teams[0].locator('.notice', { hasText: 'Die Übung ist pausiert' })).toHaveCount(0)
+  await expect(host.getByText('Neustart: fertig')).toBeVisible({ timeout: 15_000 })
+
+  // Zweiter Tab darf nicht zum zweiten Spielleiter werden
+  const second = await context.newPage()
+  await second.goto(host.url())
+  await expect(second.getByText('Spiel ist schon geöffnet')).toBeVisible({ timeout: 10_000 })
+
+  // Schließen fragt nach
+  const dialog = host.waitForEvent('dialog')
+  await host.close({ runBeforeUnload: true })
+  const asked = await dialog
+  expect(asked.type()).toBe('beforeunload')
+  await asked.dismiss()
+  await expect(host.getByTestId('phase-title')).toHaveText(/Ereignis 6/)
+})
 
 test('Hilfe, Mindestanzahl und Spielleiter als Brücke', async ({ context }) => {
   const page = await context.newPage()

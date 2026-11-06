@@ -6,7 +6,7 @@ import { shiftText } from '../src/game/cipher'
 import { isEmojiOnly } from '../src/game/emoji'
 import { CM_PER_UNIT, FRAME_H, FRAME_W, piecePolygon, polygonArea, shieldCoverage } from '../src/game/geometry'
 import { project } from '../src/game/projection'
-import { canStart, createGame, joinTeam, makeGameCode, reduce, setHostTeam, tick, totalKw } from '../src/game/reducer'
+import { canStart, createGame, joinTeam, makeGameCode, pauseAfterHostReturn, reduce, setHostTeam, tick, totalKw } from '../src/game/reducer'
 import { GM, ROLE_IDS } from '../src/game/types'
 import type { Action, GameState, PieceKind, Placement } from '../src/game/types'
 import { solveShield } from './solveShield'
@@ -266,6 +266,44 @@ describe('Landung', () => {
     s = { ...s, ship: { ...s.ship, hull: 100 }, e7: { ...s.e7, attempts: 1 } }
     s = reduce(s, { type: 'e7Land', code: '000000000000' }, owner(s, 'LS'), 5)
     expect(s.failure).toMatch(/abgestürzt/)
+  })
+})
+
+describe('Wiederaufnahme nach Ausfall der Spielleitung', () => {
+  const restart = () => {
+    let s = toPhase(setup(7), 'e6')
+    s = reduce(s, { type: 'e6Start' }, owner(s, 'LS'), 1000)
+    return { ...s, hostSeenAt: 61_000 }
+  }
+  it('Spiel steht ab dem letzten Lebenszeichen still', () => {
+    const s = pauseAfterHostReturn(restart(), 3_600_000)
+    expect(s.pausedAt).toBe(61_000)
+  })
+  it('Neustart gilt nach einer Stunde Ausfall nicht als geschafft und läuft mit der Restzeit weiter', () => {
+    let s = pauseAfterHostReturn(restart(), 3_600_000)
+    expect(tick(s, 3_600_000).e6.done).toBe(false)
+    s = reduce(s, { type: 'resume' }, GM, 3_600_000)
+    expect(s.pausedAt).toBeNull()
+    expect(tick(s, 3_600_000).e6.done).toBe(false)
+    expect(tick(s, 3_600_000 + 239_000).e6.done).toBe(false)
+    expect(tick(s, 3_600_000 + 240_000).e6.done).toBe(true)
+  })
+  it('Phasenzeit zählt die Ausfallzeit nicht mit', () => {
+    let s = pauseAfterHostReturn({ ...restart(), phaseStartedAt: 1000 }, 3_600_000)
+    s = reduce(s, { type: 'resume' }, GM, 3_600_000)
+    expect(3_600_000 - s.phaseStartedAt - s.pausedMs).toBe(60_000)
+  })
+  it('Chat während der Pause unterbricht den Neustart nicht', () => {
+    let s = pauseAfterHostReturn(restart(), 3_600_000)
+    s = { ...s, e4: { ...s.e4, checkedIn: s.teams.map((t) => t.id) } }
+    s = reduce(s, { type: 'chat', to: 'all', text: 'Seid ihr noch da?' }, owner(s, 'S4'), 3_600_000)
+    expect(s.e6.interrupts).toBe(0)
+  })
+  it('Bereits pausiertes Spiel, Lobby und Ende bleiben unverändert', () => {
+    const paused = reduce(restart(), { type: 'pause' }, GM, 5000)
+    expect(pauseAfterHostReturn(paused, 9000)).toBe(paused)
+    const lobby = createGame({ code: 'X', teamCount: 2, now: 0 })
+    expect(pauseAfterHostReturn(lobby, 9000)).toBe(lobby)
   })
 })
 

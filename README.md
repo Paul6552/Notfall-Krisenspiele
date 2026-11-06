@@ -22,7 +22,15 @@ Das Spiel läuft unter **https://paul6552.github.io/Notfall-Krisenspiele/**. Jed
 4. **Spielleiter:** Rollen vergeben, festlegen, ob er selbst die Brücke spielt und ob der Chat im Spiel oder externe Tools genutzt werden. Dann die Übung starten.
 5. **Während der Übung:** Der Spielleiter schaltet Ereignisse per Knopf weiter. Timer sind nur Richtwerte.
 
-Der Browser des Spielleiters hält den Spielstand. Er muss während der Übung offen bleiben. Bei einem Absturz: dieselbe Seite im selben Browser wieder öffnen, „Spiel fortsetzen“ wählen, die Teams verbinden sich neu. Zur Sicherung gibt es in der Konsole „Spielstand als Datei sichern“.
+### Wenn der Spielleiter-Browser zugeht
+
+Der Browser des Spielleiters hält den Spielstand und speichert jede Änderung sofort in der IndexedDB. Beim Schließen fragt er nach.
+
+1. Dieselbe Seite im **selben Browser auf demselben Gerät** öffnen und unter „Spiel fortsetzen“ das Spiel wählen.
+2. Die Teams verbinden sich von selbst neu. Sie müssen nichts tun, solange ihre Seite offen bleibt.
+3. Das Spiel steht ab dem Moment der Unterbrechung still. Die Spielleitung drückt „Fortsetzen“, wenn alle wieder da sind. Timer und Reaktor-Neustart laufen dann dort weiter, wo sie standen.
+
+Der Spielstand liegt nur in diesem Browser. Ein privates Fenster löscht ihn beim Schließen, nutzt es deshalb nicht. Für einen Gerätewechsel oder als Sicherung gibt es in der Konsole „Spielstand als Datei sichern“. Die Datei lässt sich auf der Startseite wieder laden.
 
 ## Technik
 

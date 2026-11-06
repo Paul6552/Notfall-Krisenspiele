@@ -93,7 +93,7 @@ export function Banners({ view }: { view: View }) {
   const rule = PHASE_INFO[view.phase].rule
   return (
     <>
-      {view.pausedAt && <Notice tone="warn">Die Übung ist pausiert.</Notice>}
+      {view.pausedAt && <Notice tone="warn">Die Übung ist pausiert. Die Uhr steht, bis die Spielleitung fortsetzt.</Notice>}
       {view.failure && <Notice tone="bad"><strong>Mission gescheitert.</strong> {view.failure} Die Spielleitung entscheidet, wie es weitergeht.</Notice>}
       {rule && <Notice tone="warn">{rule}</Notice>}
     </>

@@ -17,4 +17,12 @@ test('Spielleiter und Team verbinden sich aus getrennten Browsern', async ({ bro
   await team.getByRole('button', { name: 'Beitreten' }).click()
   await expect(team.getByText('Willkommen an Bord')).toBeVisible({ timeout: 60_000 })
   await expect(host.locator('.team-list')).toContainText('Fernes Team')
+
+  // Spielleiter schließt den Tab und kommt zurück: Das Team verbindet sich über das Netz neu.
+  await host.close()
+  const back = await a.newPage()
+  await back.goto('./#/')
+  await back.getByRole('link', { name: 'Fortsetzen' }).first().click()
+  await expect(back.locator('.team-list')).toContainText('Fernes Team')
+  await expect(back.locator('.team-list .dot.on')).toHaveCount(1, { timeout: 60_000 })
 })

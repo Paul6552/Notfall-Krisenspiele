@@ -231,6 +231,19 @@ function evaluateReactor(s: GameState, now: number) {
   if (off.includes('display')) add('Cockpit-Scheiben beschlagen: schlechtere Sicht für die Piloten.')
 }
 
+/**
+ * Wird beim Öffnen eines gespeicherten Spiels aufgerufen. Die Zeit ohne Spielleiter zählt nicht:
+ * Das Spiel steht ab dem letzten Lebenszeichen still, bis die Spielleitung fortsetzt.
+ */
+export function pauseAfterHostReturn(state: GameState, now: number): GameState {
+  if (state.phase === 'lobby' || state.phase === 'done' || state.pausedAt) return state
+  const s = structuredClone(state)
+  s.pausedAt = s.hostSeenAt ?? now
+  log(s, now, 'Spielleitung war getrennt. Die Übung ist pausiert.', 'info')
+  system(s, now, 'Die Spielleitung ist zurück. Die Übung ist pausiert und geht gleich weiter.')
+  return s
+}
+
 export function tick(state: GameState, now: number): GameState {
   if (state.phase !== 'e6' || state.pausedAt) return state
   const started = state.e6.restartStartedAt
@@ -329,6 +342,7 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
         const pause = now - s.pausedAt
         s.pausedMs += pause
         if (s.e6.restartStartedAt) s.e6.restartStartedAt += pause
+        if (s.e7.lastCharAt) s.e7.lastCharAt += pause
         s.pausedAt = null
       }
       break
@@ -367,7 +381,7 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
         if (s.comms.emojiOnly && !isEmojiOnly(text)) throw new RuleError('Ionensturm: Es sind nur Emojis erlaubt.')
       }
       s.chat.push({ id: s.nextMsgId++, ts: now, from: actor, to: action.to, text, net: s.comms.net === 'backup' ? 'backup' : 'primary' })
-      if (!gm && s.comms.silence) interruptRestart(s, now, teamName(s, actor))
+      if (!gm && s.comms.silence && !s.pausedAt) interruptRestart(s, now, teamName(s, actor))
       break
     }
     case 'statement': {

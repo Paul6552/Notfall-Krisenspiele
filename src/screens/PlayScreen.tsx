@@ -1,7 +1,8 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { go } from '../app/router'
 import { ClientSession } from '../net/client'
-import { deleteClient, loadClient } from '../storage/db'
+import { isLocalNet } from '../net/transport'
+import { deleteClient, loadClient, loadGame } from '../storage/db'
 import { ShipScene } from '../ship/Ship'
 import { GameRoom } from './GameRoom'
 import { CenterMessage, Notice } from './shared'
@@ -11,7 +12,12 @@ export function PlayScreen({ code }: { code: string }) {
   const [draft, setDraft] = useState('')
 
   useEffect(() => {
-    void loadClient(code).then((rec) => setName(rec?.token ? rec.name : ''))
+    void (async () => {
+      // Der Spielleiter öffnet versehentlich den Einladungslink: zurück in die eigene Konsole.
+      if (!isLocalNet() && (await loadGame(code))) return go(`/host/${code}`)
+      const rec = await loadClient(code)
+      setName(rec?.token ? rec.name : '')
+    })()
   }, [code])
 
   if (name === null) return <CenterMessage title="Wird geladen …" />
@@ -90,7 +96,7 @@ function Connected({ session, code, onReset }: { session: ClientSession; code: s
   return (
     <>
       {lost}
-      <GameRoom view={view} act={session.dispatch} error={rejected} clockOffset={clockOffset} />
+      <GameRoom view={status === 'hostLost' ? { ...view, pausedAt: view.pausedAt ?? Date.now() } : view} act={session.dispatch} error={rejected} clockOffset={clockOffset} />
     </>
   )
 }

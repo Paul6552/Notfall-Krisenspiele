@@ -16,6 +16,8 @@ export interface ClientSnapshot {
 }
 
 const NOT_FOUND_MS = 25_000
+/** Bei Absturz oder Stromausfall meldet sich der Spielleiter nicht ab. Bleibt sein Herzschlag aus, gilt er als getrennt. */
+const HOST_SILENT_MS = 12_000
 
 /** Läuft im Browser eines Teams. */
 export class ClientSession {
@@ -25,6 +27,8 @@ export class ClientSession {
   private listeners = new Set<() => void>()
   private record: ClientRecord
   private notFound?: ReturnType<typeof setTimeout>
+  private watchdog?: ReturnType<typeof setInterval>
+  private lastHeard = 0
   private closed = false
 
   constructor(private code: string, name: string) {
@@ -47,12 +51,25 @@ export class ClientSession {
       this.set({ status: 'hostLost' })
     }
     transport.onError = (message) => this.set({ joinError: message })
+    this.watchdog = setInterval(() => {
+      if (!this.host || Date.now() - this.lastHeard < HOST_SILENT_MS) return
+      this.host = null
+      this.set({ status: 'hostLost' })
+    }, 2000)
+    const greet = (peer: string) => {
+      this.host = peer
+      clearTimeout(this.notFound)
+      transport.send({ t: 'hello', name: this.record.name, token: this.record.token }, peer)
+    }
     transport.onMessage = (peer, msg) => {
+      this.lastHeard = Date.now()
       switch (msg.t) {
         case 'host':
-          this.host = peer
-          clearTimeout(this.notFound)
-          transport.send({ t: 'hello', name: this.record.name, token: this.record.token }, peer)
+          greet(peer)
+          break
+        case 'ping':
+          // Nur der Spielleiter sendet Herzschläge. War er kurz weg, meldet sich das Team neu an.
+          if (!this.host) greet(peer)
           break
         case 'welcome':
           this.record = { ...this.record, token: msg.token, teamId: msg.teamId, name: msg.name }
@@ -103,6 +120,7 @@ export class ClientSession {
   close() {
     this.closed = true
     clearTimeout(this.notFound)
+    clearInterval(this.watchdog)
     this.transport?.close()
   }
 }

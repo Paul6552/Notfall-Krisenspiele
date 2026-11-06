@@ -3,27 +3,33 @@ import { project } from '../game/projection'
 import { GM, RuleError } from '../game/types'
 import type { Action, GameState } from '../game/types'
 import { HostSession } from '../net/host'
-import { loadGame } from '../storage/db'
+import { acquireHostLock, loadGame } from '../storage/db'
 import { Console } from './Console'
 import { GameRoom } from './GameRoom'
 import { Lobby } from './Lobby'
-import { CenterMessage } from './shared'
+import { CenterMessage, Notice } from './shared'
 
 function useHost(code: string) {
-  const [session, setSession] = useState<HostSession | null | undefined>(undefined)
+  const [session, setSession] = useState<HostSession | null | 'locked' | undefined>(undefined)
   useEffect(() => {
     let alive = true
     let created: HostSession | undefined
-    void loadGame(code).then((state) => {
-      if (!alive) return
+    let release: (() => void) | null = null
+    void (async () => {
+      release = await acquireHostLock(code)
+      if (!alive) return release?.()
+      if (!release) return setSession('locked')
+      const state = await loadGame(code)
+      if (!alive) return release()
       if (!state) return setSession(null)
       created = new HostSession(state)
       void created.start()
       setSession(created)
-    })
+    })()
     return () => {
       alive = false
       created?.close()
+      if (created) release?.()
     }
   }, [code])
   return session
@@ -32,6 +38,13 @@ function useHost(code: string) {
 export function HostScreen({ code }: { code: string }) {
   const session = useHost(code)
   if (session === undefined) return <CenterMessage title="Spielstand wird geladen …" />
+  if (session === 'locked') {
+    return (
+      <CenterMessage title="Spiel ist schon geöffnet">
+        <p>{code} läuft bereits in einem anderen Tab dieses Browsers. Arbeitet dort weiter, zwei Tabs würden sich gegenseitig überschreiben.</p>
+      </CenterMessage>
+    )
+  }
   if (session === null) {
     return (
       <CenterMessage title="Spiel nicht gefunden">
@@ -45,6 +58,7 @@ export function HostScreen({ code }: { code: string }) {
 
 function HostGame({ session }: { session: HostSession }) {
   const state: GameState = useSyncExternalStore(session.subscribe, () => session.state)
+  const saveFailed = useSyncExternalStore(session.subscribe, () => session.saveFailed)
   const [error, setError] = useState<{ message: string; at: number } | null>(null)
   const [tab, setTab] = useState<'console' | 'bridge'>('console')
   const hostTeam = state.teams.find((t) => t.isHost)
@@ -59,10 +73,28 @@ function HostGame({ session }: { session: HostSession }) {
     }
   }
 
+  // Fragt vor dem Schließen nach, solange die Übung nicht beendet ist.
+  const running = state.phase !== 'done'
+  useEffect(() => {
+    if (!running) return
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = '' // Für ältere Browser
+    }
+    addEventListener('beforeunload', warn)
+    return () => removeEventListener('beforeunload', warn)
+  }, [running])
+
+  const warning = saveFailed && (
+    <Notice tone="bad">Der Spielstand konnte nicht gespeichert werden. Sichert ihn sofort über „Spielstand als Datei sichern“ und schließt diesen Tab nicht.</Notice>
+  )
+
   const bridgeView = useMemo(() => (hostTeam && state.phase !== 'lobby' ? project(state, hostTeam.id) : null), [state, hostTeam])
 
   if (state.phase === 'lobby') {
     return (
+      <>
+      {warning}
       <Lobby
         state={state}
         act={run}
@@ -76,11 +108,13 @@ function HostGame({ session }: { session: HostSession }) {
           }
         }}
       />
+      </>
     )
   }
 
   return (
     <div>
+      {warning}
       {bridgeView && (
         <div className="tabs" role="tablist" aria-label="Ansicht">
           <button role="tab" aria-selected={tab === 'console'} onClick={() => setTab('console')}>Spielleitung</button>

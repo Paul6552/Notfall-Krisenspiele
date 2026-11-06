@@ -78,6 +78,8 @@ export interface GameState {
   pausedAt: number | null
   pausedMs: number
   startedAt: number | null
+  /** Letztes Lebenszeichen des Spielleiter-Browsers. */
+  hostSeenAt?: number
   ship: ShipStatus
   failure: string | null
   chat: ChatMsg[]

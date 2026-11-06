@@ -41,6 +41,25 @@ function tabSuffix() {
 
 export const clientKey = (code: string) => `${code}${tabSuffix()}`
 
+/**
+ * Sichert, dass nur ein Tab dieses Browsers Spielleiter ist. Zwei Tabs würden sich gegenseitig überschreiben.
+ * Mehrere Versuche, weil ein gerade geschlossener Tab seine Sperre kurz noch hält.
+ */
+export async function acquireHostLock(code: string): Promise<(() => void) | null> {
+  if (!navigator.locks) return () => {}
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const release = await new Promise<(() => void) | null>((resolve) => {
+      void navigator.locks.request(`host-${code}`, { ifAvailable: true }, (lock) => {
+        if (!lock) return resolve(null)
+        return new Promise<void>((done) => resolve(done))
+      })
+    })
+    if (release) return release
+    await new Promise((r) => setTimeout(r, 300))
+  }
+  return null
+}
+
 export const saveGame = async (state: GameState) => void (await (await open()).put('games', state))
 export const loadGame = async (code: string) => (await open()).get('games', code)
 export const listGames = async () => (await open()).getAll('games')

@@ -1,27 +1,35 @@
 import { project } from '../game/projection'
-import { joinTeam, reduce, setHostTeam, setOnline, tick } from '../game/reducer'
+import { joinTeam, pauseAfterHostReturn, reduce, setHostTeam, setOnline, tick } from '../game/reducer'
 import { GM, RuleError } from '../game/types'
 import type { Action, GameState } from '../game/types'
 import { saveGame } from '../storage/db'
 import { connect } from './transport'
 import type { NetMsg, Transport } from './transport'
 
+const HEARTBEAT_MS = 5000
+
 /** Läuft im Browser des Spielleiters und hält den maßgeblichen Spielstand. */
 export class HostSession {
   state: GameState
+  saveFailed = false
   private transport: Transport | null = null
   private peers = new Map<string, string>()
   private listeners = new Set<() => void>()
   private timer?: ReturnType<typeof setInterval>
   private flush?: ReturnType<typeof setTimeout>
   private closed = false
+  private lastPing = 0
 
   constructor(state: GameState) {
     // Nach einem Neuladen ist niemand verbunden, bis sich die Teams wieder melden.
-    this.state = { ...state, teams: state.teams.map((t) => ({ ...t, online: Boolean(t.isHost) })) }
+    const offline = { ...state, teams: state.teams.map((t) => ({ ...t, online: Boolean(t.isHost) })) }
+    this.state = pauseAfterHostReturn(offline, Date.now())
   }
 
   async start() {
+    this.save()
+    // Bittet den Browser, den Spielstand nicht bei Speichermangel zu löschen.
+    void navigator.storage?.persist?.()
     const transport = await connect(this.state.code)
     if (this.closed) return transport.close()
     this.transport = transport
@@ -33,8 +41,14 @@ export class HostSession {
     }
     transport.onMessage = (peer, msg) => this.receive(peer, msg)
     this.timer = setInterval(() => {
-      const next = tick(this.state, Date.now())
+      const now = Date.now()
+      const next = tick(this.state, now)
       if (next !== this.state) this.commit(next)
+      else if (now - (this.state.hostSeenAt ?? 0) >= HEARTBEAT_MS) this.save()
+      if (now - this.lastPing >= HEARTBEAT_MS) {
+        this.lastPing = now
+        transport.send({ t: 'ping', sent: now })
+      }
     }, 1000)
   }
 
@@ -43,9 +57,27 @@ export class HostSession {
     return () => void this.listeners.delete(fn)
   }
 
+  /** Speichert sofort und hält dabei das letzte Lebenszeichen fest. */
+  private save() {
+    this.state = { ...this.state, hostSeenAt: Date.now() }
+    saveGame(this.state).then(
+      () => this.setSaveFailed(false),
+      (e) => {
+        console.error(e)
+        this.setSaveFailed(true)
+      },
+    )
+  }
+
+  private setSaveFailed(failed: boolean) {
+    if (failed === this.saveFailed) return
+    this.saveFailed = failed
+    this.listeners.forEach((fn) => fn())
+  }
+
   private commit(next: GameState) {
     this.state = next
-    void saveGame(next)
+    this.save()
     this.listeners.forEach((fn) => fn())
     clearTimeout(this.flush)
     this.flush = setTimeout(() => this.broadcast(), 40)
