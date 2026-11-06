@@ -108,6 +108,7 @@ legend { font-weight: 600; margin-bottom: 4px; }
 .duration { font-size: 1.05rem; }
 .phases { padding: 8px 0 0 1.2rem; width: 100%; }
 .phases li span:first-child { margin-right: 8px; }
+.answers { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .trains { padding: 8px 0 0 1.2rem; margin: 0; display: grid; gap: 6px; }
 summary { cursor: pointer; color: var(--accent); }
 @media (max-width: 560px) { .game-card { grid-template-columns: 1fr; } .game-art { min-height: 120px; } }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { E1_QUESTIONS } from '../game/content/flugZumMars'
+import { E1_QUESTIONS, noGoText } from '../game/content/flugZumMars'
 import { teamName } from '../game/reducer'
 import { Notice } from '../screens/shared'
 import type { PanelProps } from './types'
@@ -9,7 +9,8 @@ export function E1({ view, role, act }: PanelProps) {
   return (
     <div className="stack">
       <p>Recherchiert die Antworten und meldet sie an die Brücke. Die Brücke hat die Sollwerte.</p>
-      {E1_QUESTIONS.map((q, i) => <Question key={i} index={i} text={q} sent={view.e1.answers[i]?.text} act={act} locked={view.e1.decision === 'go'} />)}
+      {!view.e1.decision && Boolean(view.e1.noGos) && <Notice tone="warn">{noGoText(view.e1.noGos!)}</Notice>}
+      {E1_QUESTIONS.map((q, i) => <Question key={i} index={i} text={q} sent={view.e1.answers[i]?.[view.me]} act={act} locked={view.e1.decision === 'go'} />)}
       {view.e1.decision === 'go' && <Notice tone="good">Die Brücke hat GO gegeben. Die ARES 1 hebt ab.</Notice>}
     </div>
   )
@@ -36,13 +37,17 @@ function Bridge({ view, act }: PanelProps) {
     <div className="stack">
       <Notice tone="warn">Nur die Brücke hat diese Startdaten. Gebt sie nicht weiter, prüft die Antworten der Teams.</Notice>
       {E1_QUESTIONS.map((q, i) => {
-        const a = view.e1.answers[i]
+        const answers = Object.entries(view.e1.answers[i] ?? {})
         const mark = view.e1.marks[i]
         return (
           <div className="question" key={i}>
             <p><strong>Frage {i + 1}.</strong> {q}</p>
             <p className="target">Sollwert: {targets[i]}</p>
-            <p>{a ? <>Antwort von {teamName(view, a.by)}: <strong>{a.text}</strong></> : <span className="muted">Noch keine Antwort</span>}</p>
+            {answers.length ? (
+              <ul className="answers">
+                {answers.map(([team, text]) => <li key={team}>Antwort von {teamName(view, team)}: <strong>{text}</strong></li>)}
+              </ul>
+            ) : <p className="muted">Noch keine Antwort</p>}
             <div className="row">
               <button className={`btn small ${mark === true ? 'selected' : ''}`} aria-pressed={mark === true} onClick={() => act({ type: 'e1Mark', q: i, ok: true })}>Korrekt</button>
               <button className={`btn small ${mark === false ? 'selected bad' : ''}`} aria-pressed={mark === false} onClick={() => act({ type: 'e1Mark', q: i, ok: false })}>Falsch</button>
@@ -50,6 +55,7 @@ function Bridge({ view, act }: PanelProps) {
           </div>
         )
       })}
+      {!decided && Boolean(view.e1.noGos) && <Notice tone="warn">{noGoText(view.e1.noGos!)}</Notice>}
       {decided ? <Notice tone="good">GO erteilt. Die Spielleitung startet das nächste Ereignis.</Notice> : (
         <div className="row">
           <button className="btn primary" onClick={() => act({ type: 'e1Decide', go: true })}>GO für den Start</button>

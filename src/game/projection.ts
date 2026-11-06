@@ -63,7 +63,7 @@ export function project(s: GameState, viewer: string): View {
     chat: chat.filter((m) => gm || m.to === ALL || m.to === viewer || m.from === viewer),
     e1: {
       ...e1,
-      answers: seesAllE1 ? e1.answers : Object.fromEntries(Object.entries(e1.answers).filter(([, a]) => a.by === viewer)),
+      answers: seesAllE1 ? e1.answers : Object.fromEntries(Object.entries(e1.answers).filter(([, a]) => viewer in a).map(([q, a]) => [q, { [viewer]: a[viewer] }])),
       marks: seesAllE1 ? e1.marks : {},
     },
     e2: { planSent: e2.planSent, built: e2.built, placed: e2.placed, repaired: e2.repaired },

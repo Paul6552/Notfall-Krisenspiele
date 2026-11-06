@@ -1,0 +1,288 @@
+/** Klänge der Filme. Alles entsteht im Browser, es gibt keine Audiodateien. */
+import type { Cutscene } from '../game/types'
+
+/** Treffer der Mikrometeoriten in Sekunden, passend zum Bild. */
+export const IMPACT_HITS = [12.6, 13.4, 14.1, 14.8, 15.3]
+
+const VOLUME = 0.7
+const STORAGE_KEY = 'krisenuebung.stumm'
+
+const note = (semitonesFromA4: number) => 440 * 2 ** (semitonesFromA4 / 12)
+const noiseBuffers = new WeakMap<BaseAudioContext, AudioBuffer>()
+
+function noiseBuffer(ac: BaseAudioContext) {
+  let buffer = noiseBuffers.get(ac)
+  if (!buffer) {
+    buffer = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate)
+    const data = buffer.getChannelData(0)
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+    noiseBuffers.set(ac, buffer)
+  }
+  return buffer
+}
+
+interface Shape {
+  vol?: number
+  attack?: number
+  release?: number
+}
+
+/**
+ * Plant die Klänge eines Films ein. `base` ist die Zeit des Filmbeginns im Audiokontext,
+ * `from` die Sekunde, ab der gespielt wird (wer später dazukommt, hört nur den Rest).
+ */
+export function scheduleFilm(
+  ac: BaseAudioContext,
+  out: AudioNode,
+  film: Pick<Cutscene, 'scene' | 'tone'>,
+  base: number,
+  from: number,
+  stingAt: number,
+  reduced = false,
+): AudioScheduledSourceNode[] {
+  const sources: AudioScheduledSourceNode[] = []
+
+  const envelope = (t: number, d: number, { vol = 0.2, attack = 0.01, release = 0.08 }: Shape) => {
+    if (t + d <= from) return null
+    const at = base + Math.max(t, from)
+    const end = base + t + d
+    const gain = ac.createGain()
+    gain.gain.setValueAtTime(0, at)
+    gain.gain.linearRampToValueAtTime(vol, Math.min(at + attack, end))
+    gain.gain.setValueAtTime(vol, Math.max(at + attack, end - release))
+    gain.gain.linearRampToValueAtTime(0, end)
+    gain.connect(out)
+    return { at, end, gain }
+  }
+
+  const tone = (freq: number, t: number, d: number, o: Shape & { type?: OscillatorType; to?: number } = {}) => {
+    const e = envelope(t, d, o)
+    if (!e) return
+    const osc = ac.createOscillator()
+    osc.type = o.type ?? 'sine'
+    osc.frequency.setValueAtTime(freq, e.at)
+    if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, e.end)
+    osc.connect(e.gain)
+    osc.start(e.at)
+    osc.stop(e.end + 0.02)
+    sources.push(osc)
+  }
+
+  const noise = (t: number, d: number, o: Shape & { filter?: BiquadFilterType; freq?: number; to?: number; q?: number } = {}) => {
+    const e = envelope(t, d, o)
+    if (!e) return
+    const src = ac.createBufferSource()
+    src.buffer = noiseBuffer(ac)
+    src.loop = true
+    const filter = ac.createBiquadFilter()
+    filter.type = o.filter ?? 'lowpass'
+    filter.Q.value = o.q ?? 1
+    filter.frequency.setValueAtTime(o.freq ?? 800, e.at)
+    if (o.to) filter.frequency.exponentialRampToValueAtTime(o.to, e.end)
+    src.connect(filter).connect(e.gain)
+    src.start(e.at)
+    src.stop(e.end + 0.02)
+    sources.push(src)
+  }
+
+  /** Weicher Flächenklang als Musik unter dem Film. */
+  const pad = (semitones: number[], t: number, d: number, vol = 0.14) => {
+    for (const s of semitones) tone(note(s), t, d, { type: 'triangle', vol: vol / semitones.length, attack: d * 0.3, release: d * 0.35 })
+  }
+
+  const melody = (semitones: number[], t: number, step: number, vol = 0.16) => {
+    semitones.forEach((s, i) => tone(note(s), t + i * step, step * 1.6, { type: 'triangle', vol, release: step }))
+  }
+
+  const sting = (t: number) => {
+    if (film.tone === 'good') {
+      melody([3, 7, 10, 15], t, 0.16)
+      pad([3, 7, 10, 15], t + 0.5, 3, 0.28)
+    } else if (film.tone === 'warn') {
+      melody([3, 6, 10], t, 0.2)
+      pad([-9, 3, 6, 10], t + 0.5, 3, 0.24)
+    } else {
+      pad([-33, -32, -21, -20], t, 4, 0.5)
+      noise(t, 1.4, { freq: 300, to: 60, vol: 0.4, release: 1 })
+    }
+  }
+
+  const thump = (t: number, vol = 0.5) => {
+    tone(120, t, 0.3, { to: 40, vol, release: 0.2 })
+    noise(t, 0.16, { filter: 'highpass', freq: 1800, vol: vol * 0.45, release: 0.12 })
+  }
+
+  if (reduced) {
+    sting(0)
+    return sources
+  }
+
+  switch (film.scene) {
+    case 'intro':
+      pad([-21, -9, -5, 0], 0, 8)
+      melody([-9, -2, 3], 1.2, 0.42, 0.1)
+      break
+    case 'prep':
+      pad([-21, -14, -9], 0, 7.5, 0.12)
+      for (let t = 0.5; t < 7.5; t += 1) tone(1200, t, 0.05, { type: 'square', vol: 0.025 })
+      noise(1, 6, { filter: 'bandpass', freq: 2500, vol: 0.03, attack: 1, release: 2 })
+      break
+    case 'launch':
+      for (const t of [0.3, 1.3, 2.3]) tone(880, t, 0.16, { type: 'square', vol: 0.07 })
+      tone(1320, 3.05, 0.4, { type: 'square', vol: 0.07 })
+      noise(3, 7.5, { freq: 240, to: 900, vol: 0.5, attack: 0.5, release: 4 })
+      tone(48, 3, 7, { type: 'sawtooth', to: 80, vol: 0.2, attack: 0.5, release: 4 })
+      pad([-21, -9, -2, 3], 6, 8, 0.14)
+      break
+    case 'impact': {
+      pad([-21, -9, -2], 0, 1.3, 0.1)
+      for (let t = 1; t < 8.2; t += 1.5) {
+        tone(620, t, 0.75, { type: 'sawtooth', to: 930, vol: 0.075, release: 0.03 })
+        tone(930, t + 0.75, 0.75, { type: 'sawtooth', to: 620, vol: 0.075, release: 0.03 })
+      }
+      pad([-33, -32, -26], 5.2, 11, 0.4)
+      for (let i = 0; i < 16; i++) {
+        const t = 8.3 + i * 0.36
+        noise(t, 0.8, { filter: 'bandpass', freq: 2400, to: 300, q: 2, vol: 0.12, attack: 0.2, release: 0.5 })
+      }
+      for (const t of IMPACT_HITS) thump(t)
+      noise(15.4, 3, { filter: 'highpass', freq: 4000, vol: 0.035, attack: 0.3, release: 2 })
+      break
+    }
+    case 'repair':
+      for (let i = 0; i < 14; i++) {
+        noise(0.5 + i * 0.32, 0.12, { filter: 'highpass', freq: 3500, vol: 0.08 })
+        tone(note(3 + (i % 7) * 2), 0.5 + i * 0.32, 0.1, { type: 'triangle', vol: 0.05 })
+      }
+      pad([-21, -14, -9], 0, 6, 0.1)
+      break
+    case 'asteroids':
+      for (let t = 0.2; t < 10.4; t += 0.6) tone(note(-33), t, 0.34, { type: 'sawtooth', vol: 0.09 })
+      for (const t of [1.4, 3.2, 4.9, 6.3, 8.4]) noise(t, 1.1, { filter: 'bandpass', freq: 1800, to: 220, q: 2, vol: 0.12, attack: 0.3, release: 0.6 })
+      for (let t = 10.6; t < 11.9; t += 0.11) noise(t, 0.05, { filter: 'highpass', freq: 2500, vol: 0.12 })
+      break
+    case 'signal':
+      ;[0, 0.14, 0.28, 0.6, 0.74, 1.05, 1.5, 1.64, 2].forEach((t) => tone(1040, t + 0.2, 0.09, { vol: 0.05 }))
+      ;[1.2, 2, 2.8, 3.6, 4.4].forEach((t, i) => tone(note(3 + i * 2), t, 0.2, { type: 'triangle', vol: 0.09 }))
+      pad([-21, -14, -9], 0, 5.5, 0.1)
+      break
+    case 'reactor':
+      tone(160, 0, 5.8, { type: 'sawtooth', to: 55, vol: 0.09, attack: 0.5, release: 1 })
+      tone(320, 0, 5.8, { type: 'triangle', to: 110, vol: 0.07, attack: 0.5, release: 1 })
+      noise(0, 5.8, { freq: 500, to: 120, vol: 0.09, attack: 0.5, release: 1 })
+      break
+    case 'restart':
+      tone(55, 0, 5.8, { type: 'sawtooth', to: 165, vol: 0.08, attack: 0.5, release: 1 })
+      pad([-21, -9, -5, 0], 0, 6, 0.12)
+      pad([-16, -4, 0, 3], 4, 5, 0.12)
+      break
+    case 'landing':
+      noise(0, 8.6, { freq: 700, to: 180, vol: 0.34, attack: 1, release: 0.2 })
+      tone(90, 0, 8.6, { type: 'sawtooth', to: 40, vol: 0.12, attack: 1, release: 0.2 })
+      pad([-21, -14, -9], 0, 8.4, 0.1)
+      thump(8.6, 0.7)
+      noise(8.6, 2.4, { freq: 700, to: 150, vol: 0.14, release: 1.8 })
+      break
+    case 'failure':
+      for (let t = 0.4; t < 2.5; t += 0.7) tone(440, t, 0.3, { type: 'square', vol: 0.06 })
+      break
+    case 'credits': {
+      const chords = [[-9, -5, 0, 3], [-14, -7, -2, 3], [-12, -5, 0, 7], [-7, 0, 3, 7]]
+      for (let i = 0; i < 4; i++) pad(chords[i], i * 4.2, 5.4, 0.2)
+      melody([7, 10, 12, 10, 7, 5, 3], 1, 0.75, 0.07)
+      melody([3, 5, 7, 12, 10, 7, 3], 9.4, 0.75, 0.07)
+      break
+    }
+  }
+  if (film.scene !== 'credits') sting(stingAt)
+  return sources
+}
+
+// Stummschaltung gilt nur für dieses Gerät.
+function readMuted() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+let muted = typeof window === 'undefined' ? false : readMuted()
+const listeners = new Set<() => void>()
+let context: AudioContext | null = null
+let master: GainNode | null = null
+let pending: (() => void) | null = null
+
+export const isMuted = () => muted
+export const subscribeMuted = (listener: () => void) => {
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
+
+export function setMuted(value: boolean) {
+  muted = value
+  try {
+    localStorage.setItem(STORAGE_KEY, value ? '1' : '0')
+  } catch {
+    // Ohne Speicher gilt die Einstellung nur bis zum Neuladen.
+  }
+  if (context && master) master.gain.setTargetAtTime(value ? 0 : VOLUME, context.currentTime, 0.02)
+  listeners.forEach((l) => l())
+}
+
+function audio() {
+  if (!context && typeof AudioContext !== 'undefined') {
+    context = new AudioContext()
+    master = context.createGain()
+    master.gain.value = muted ? 0 : VOLUME
+    master.connect(context.createDynamicsCompressor()).connect(context.destination)
+    context.onstatechange = () => {
+      if (context?.state === 'running' && pending) {
+        const start = pending
+        pending = null
+        start()
+      }
+    }
+  }
+  return context
+}
+
+// Browser erlauben Ton erst nach einer Bedienung. Der erste Klick im Spiel schaltet ihn frei.
+if (typeof window !== 'undefined') {
+  const unlock = () => { void audio()?.resume().catch(() => undefined) }
+  window.addEventListener('pointerdown', unlock, { capture: true, passive: true })
+  window.addEventListener('keydown', unlock, { capture: true, passive: true })
+}
+
+/** Spielt die Klänge eines Films und gibt eine Funktion zum Beenden zurück. */
+export function playFilm(film: Cutscene, elapsedSeconds: () => number, stingAt: number, reduced: boolean) {
+  let bus: GainNode | null = null
+  let sources: AudioScheduledSourceNode[] = []
+  const start = () => {
+    const ac = context
+    if (!ac || !master) return
+    bus = ac.createGain()
+    bus.connect(master)
+    const from = reduced ? 0 : Math.max(0, elapsedSeconds())
+    sources = scheduleFilm(ac, bus, film, ac.currentTime + 0.05 - from, from, stingAt, reduced)
+  }
+  if (audio()?.state === 'running') start()
+  else pending = start
+
+  return () => {
+    if (pending === start) pending = null
+    const ac = context
+    if (!ac || !bus) return
+    const ending = bus
+    ending.gain.setTargetAtTime(0, ac.currentTime, 0.08)
+    const stopAt = ac.currentTime + 0.5
+    for (const s of sources) {
+      try {
+        s.stop(stopAt)
+      } catch {
+        // Bereits beendet.
+      }
+    }
+    setTimeout(() => ending.disconnect(), 700)
+  }
+}

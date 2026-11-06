@@ -160,6 +160,9 @@ export const formatDuration = (minutes: number) => {
 }
 
 // --- Ereignis 1 ---------------------------------------------------------------
+export const noGoText = (count: number) =>
+  `NO-GO: Die Brücke hat das Startfenster verschoben. Das kostet 10 Minuten Zeitpuffer${count > 1 ? ` (bisher ${count} Mal, ${count * 10} Minuten)` : ''}. Prüft eure Antworten, danach entscheidet die Brücke neu.`
+
 export const E1_QUESTIONS = [
   'Wie dick muss der Treibstofftank unseres Raumschiffes sein? (Wir verwenden denselben Edelstahl-Tank wie SpaceX Starship.)',
   'Welche zwei Flüssigkeiten sind in den Treibstofftanks? Unser Raumschiff ist dem Starship nachgebaut.',

@@ -6,6 +6,7 @@
 @keyframes c-bar { from { transform: translateY(var(--from, -100%)); } }
 
 .c-skip { position: absolute; right: 16px; bottom: calc(3.5vh - 16px); z-index: 12; font: inherit; font-size: .85rem; color: #cfd8e2; background: rgb(255 255 255 / .1); border: 1px solid rgb(255 255 255 / .3); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.c-mute { right: auto; left: 16px; }
 .c-skip:hover { background: rgb(255 255 255 / .2); }
 
 .c-caption { position: absolute; left: 16px; right: 16px; top: 15vh; z-index: 7; text-align: center; animation: c-caption 1s cubic-bezier(.2, .8, .2, 1) both; text-shadow: 0 2px 22px rgb(0 0 0 / .85); }
@@ -63,6 +64,41 @@
 }
 .c-smoke { position: absolute; bottom: 15vh; width: 18vh; height: 18vh; margin-left: -9vh; border-radius: 50%; background: #e7ecf0; filter: blur(14px); z-index: 5; animation: c-smoke 3.6s both; }
 @keyframes c-smoke { from { opacity: 0; transform: scale(.2); } 25% { opacity: .95; } to { opacity: 0; transform: scale(3) translateY(-5vh); } }
+
+/* Alarm und Einschlag */
+.c-shakebox { position: absolute; inset: 0; animation: c-jolt 21s both; }
+@keyframes c-jolt {
+  0%, 59.9%, 62%, 63.7%, 65.4%, 67.1%, 68.8%, 100% { transform: none; }
+  60.3% { transform: translate(-10px, 6px); } 61% { transform: translate(7px, -5px); }
+  64% { transform: translate(9px, 6px); } 64.6% { transform: translate(-6px, -4px); }
+  67.3% { transform: translate(-11px, -6px); } 68% { transform: translate(8px, 5px); }
+  70.6% { transform: translate(12px, -7px); } 71.3% { transform: translate(-8px, 5px); } 72.5% { transform: none; }
+  73% { transform: translate(-14px, 8px); } 73.8% { transform: translate(9px, -6px); } 75% { transform: none; }
+}
+.c-hitship { left: 34%; bottom: auto; top: 58%; height: 30vh; transform: translate(-50%, -50%) rotate(90deg); }
+.c-reds { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; animation: c-on .3s 1s both; }
+@keyframes c-on { from { opacity: 0; } }
+.c-redglow { position: absolute; inset: 0; box-shadow: inset 0 0 18vmin 5vmin #ff1414; opacity: .55; animation: c-alert .75s ease-in-out infinite alternate; }
+@keyframes c-alert { from { opacity: .18; } to { opacity: .95; } }
+.c-beacon { position: absolute; width: 90vmin; height: 90vmin; margin: -45vmin; border-radius: 50%; background: radial-gradient(circle, rgb(255 30 20 / .8), transparent 62%); opacity: .4; animation: c-alert .75s ease-in-out infinite alternate; }
+.c-beacon.tl { left: 0; top: 0; } .c-beacon.br { left: 100%; top: 100%; }
+.c-beacon.tr { left: 100%; top: 0; animation-delay: .75s; } .c-beacon.bl { left: 0; top: 100%; animation-delay: .75s; }
+.c-msg { position: absolute; left: 16px; right: 16px; top: 13vh; z-index: 7; text-align: center; font-weight: 900; opacity: 0; text-shadow: 0 3px 26px #000; }
+.c-alarmword { font-size: clamp(4rem, 19vw, 15rem); line-height: 1; letter-spacing: .05em; color: #ff3b30; animation: c-blink 4s 1s both; }
+@keyframes c-blink { 0% { opacity: 0; transform: scale(1.3); } 6%, 25%, 50%, 75%, 94% { opacity: 1; transform: none; } 15%, 40%, 65%, 85% { opacity: .3; } 100% { opacity: 0; } }
+.c-ahead { font-size: clamp(2.2rem, 8vw, 6rem); color: #ffd36b; animation: c-show 3.4s 5.2s both; }
+.c-hold { display: grid; gap: 8px; font-size: clamp(1.1rem, 3vw, 2rem); animation: c-show 6.8s 8.8s both; }
+.c-hold strong { font-size: 1.5em; color: #ff8a6b; }
+.c-hold span { font-weight: 600; }
+@keyframes c-show { 0% { opacity: 0; transform: translateY(14px); } 8%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.c-meteor { position: absolute; left: 112%; z-index: 3; border-radius: 50% 12% 12% 50%; background: linear-gradient(90deg, #d9b08c, #8a5a3c 28%, rgb(255 120 50 / .75) 44%, transparent); animation: c-meteor linear both; }
+@keyframes c-meteor { to { transform: translate(calc(-125vw - 260px), 9vh); } }
+.c-micro { position: absolute; left: 106%; width: 7px; height: 7px; border-radius: 50%; background: #ffe0b0; box-shadow: 0 0 10px 3px #ff9b3d; z-index: 5; opacity: 0; animation: c-micro .4s linear both; }
+@keyframes c-micro { 0% { opacity: 1; } 99% { opacity: 1; left: 38%; } 100% { opacity: 0; left: 38%; } }
+.c-hit { position: absolute; width: 16px; height: 16px; margin: -8px; border-radius: 50%; background: #fff; box-shadow: 0 0 26px 14px #ffb347; opacity: 0; animation: c-hit .55s ease-out both; }
+@keyframes c-hit { 0% { opacity: 1; transform: scale(.3); } 100% { opacity: 0; transform: scale(2.6); } }
+.c-leak { position: absolute; left: 62%; top: 44%; width: 5vh; height: 5vh; border-radius: 50%; background: rgb(190 190 200 / .7); filter: blur(7px); opacity: 0; animation: c-leak 2.1s ease-out infinite; }
+@keyframes c-leak { 0% { opacity: .9; transform: scale(.4); } 100% { opacity: 0; transform: translate(30px, -9vh) scale(2.8); } }
 
 /* Reparatur */
 .c-shield { position: absolute; left: 50%; top: 56%; width: min(72vw, 92vh); transform: translate(-50%, -50%); z-index: 3; overflow: visible; }
@@ -137,6 +173,9 @@
 .cut.held .c-ring, .cut.held .c-vapor, .cut.held .c-clock { display: none; }
 .cut.held .c-glitch { animation: none !important; opacity: .15; }
 .cut.held .c-alarm { animation: none !important; opacity: .22; }
+.cut.held .c-redglow, .cut.held .c-beacon { animation: none !important; opacity: .4; }
+.cut.held .c-micro, .cut.held .c-hit { display: none; }
+.cut.held .c-leak { animation: none !important; opacity: .55; }
 .c-wait { position: absolute; left: 16px; right: 16px; bottom: 12vh; z-index: 12; text-align: center; animation: c-in .5s both; }
 .c-wait p { display: inline-block; margin: 0; padding: 8px 16px; border-radius: 8px; background: rgb(0 0 0 / .6); color: #e6edf4; }
 .c-wait .btn { max-width: 100%; white-space: normal; font-size: 1.05rem; box-shadow: 0 6px 26px rgb(0 0 0 / .55); }

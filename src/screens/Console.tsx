@@ -21,7 +21,7 @@ const download = (state: GameState) => {
 
 function progress(view: View, state: GameState): string[] {
   switch (view.phase) {
-    case 'e1': return [`Antworten: ${Object.keys(state.e1.answers).length} von 5`, `Entscheidung: ${state.e1.decision ?? 'offen'}`]
+    case 'e1': return [`Beantwortete Fragen: ${Object.keys(state.e1.answers).length} von 5`, `Entscheidung: ${state.e1.decision ?? 'offen'}`]
     case 'e2': return [`Bauplan gesendet: ${state.e2.planSent ? 'ja' : 'nein'}`, `Geliefert: ${Object.keys(state.e2.built).length} von 14`, `Eingebaut: ${Object.keys(state.e2.placed).length} von 14`, `Repariert: ${state.e2.repaired ? 'ja' : 'nein'}`]
     case 'e3': return [`Position: Spalte ${state.e3.pos.x + 1}, Zeile ${state.e3.pos.y + 1}`, `Kollisionen: ${state.e3.collisions}`, `Sturmfelder: ${state.e3.stormHits}`, `Durchquert: ${state.e3.arrived ? 'ja' : 'nein'}`, `Sturm bekannt: ${state.e3.stormKnown ? 'ja' : 'nein'}`, `Funkmast: ${state.e3.found.mast.length} von 6`, `Schaltpult: ${state.e3.found.panel.length} von 6`]
     case 'e4': return [`Notkanal: ${state.comms.net === 'backup' ? 'aktiv' : 'nicht aktiv'}`, `Angemeldet: ${state.e4.checkedIn.length} von ${state.teams.length}`]

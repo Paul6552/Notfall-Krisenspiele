@@ -2,7 +2,7 @@
 import type { Cutscene, CutsceneScene, GameState, Phase } from '../types'
 
 const SECONDS: Record<CutsceneScene, number> = {
-  intro: 9, prep: 8, launch: 15, repair: 11, asteroids: 12, signal: 10, reactor: 11, restart: 11, landing: 14, failure: 9, credits: 18,
+  intro: 9, prep: 8, launch: 15, impact: 21, repair: 11, asteroids: 12, signal: 10, reactor: 11, restart: 11, landing: 14, failure: 9, credits: 18,
 }
 
 type Script = Pick<Cutscene, 'scene' | 'title' | 'subtitle' | 'tone' | 'kw'>
@@ -15,7 +15,7 @@ function script(from: Phase, s: GameState, kw: number): Script | null {
     case 'checkin':
       return { scene: 'prep', title: 'Startvorbereitung läuft', subtitle: 'Die ARES 1 wird betankt. Alle Sektionen an ihre Plätze!', tone: 'good' }
     case 'e1':
-      return s.e1.decision === 'go'
+      return s.e1.decision === 'go' && !s.e1.noGos
         ? { scene: 'launch', title: 'Erfolgreich gestartet', subtitle: 'Die ARES 1 ist auf dem Weg zum Mars.', tone: 'good' }
         : { scene: 'launch', title: 'Gestartet mit Verspätung', subtitle: 'Die ARES 1 ist unterwegs, aber das Startfenster war knapp.', tone: 'warn' }
     case 'e2':
@@ -43,6 +43,15 @@ function script(from: Phase, s: GameState, kw: number): Script | null {
       return { scene: 'credits', title: 'Mission Red Planet', subtitle: 'Danke an alle Sektionen!', tone: 'good' }
     default:
       return null
+  }
+}
+
+/** Manche Filme ziehen nach der Freigabe einen zweiten nach sich. */
+export function followUpCutscene(c: Cutscene, at: number): Cutscene | null {
+  if (c.scene !== 'launch') return null
+  return {
+    id: c.id + 1, at, seconds: SECONDS.impact, released: false, scene: 'impact', tone: 'bad',
+    title: 'WIR SIND GETROFFEN – HÜLLENSCHADEN', subtitle: 'Wir brauchen umgehend Reparatur!',
   }
 }
 

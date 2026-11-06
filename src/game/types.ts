@@ -25,7 +25,7 @@ export interface Settings {
   cutscenes: boolean
 }
 
-export type CutsceneScene = 'intro' | 'prep' | 'launch' | 'repair' | 'asteroids' | 'signal' | 'reactor' | 'restart' | 'landing' | 'failure' | 'credits'
+export type CutsceneScene = 'intro' | 'prep' | 'launch' | 'impact' | 'repair' | 'asteroids' | 'signal' | 'reactor' | 'restart' | 'landing' | 'failure' | 'credits'
 
 export interface Cutscene {
   id: number
@@ -108,9 +108,12 @@ export interface GameState {
   consequences: string[]
   comms: { net: 'primary' | 'down' | 'backup'; emojiOnly: boolean; silence: boolean }
   e1: {
-    answers: Record<number, { text: string; by: string }>
+    /** Frage → Team → Antwort. Jedes Team hat seine eigene Antwort. */
+    answers: Record<number, Record<string, string>>
     marks: Record<number, boolean>
-    decision: 'go' | 'nogo' | null
+    decision: 'go' | null
+    /** Wie oft die Brücke das Startfenster verschoben hat. */
+    noGos?: number
   }
   e2: {
     cipherShift: number

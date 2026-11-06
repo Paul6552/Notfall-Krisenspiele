@@ -6,7 +6,7 @@ import { shiftText } from '../src/game/cipher'
 import { isEmojiOnly } from '../src/game/emoji'
 import { CM_PER_UNIT, FRAME_H, FRAME_W, piecePolygon, polygonArea, shieldCoverage } from '../src/game/geometry'
 import { project } from '../src/game/projection'
-import { advanceWarnings, canStart, createGame, joinTeam, makeGameCode, pauseAfterHostReturn, reduce, setHostTeam, tick, totalKw } from '../src/game/reducer'
+import { advanceWarnings, canStart, createGame, joinTeam, makeGameCode, pauseAfterHostReturn, reduce, setHostTeam, tick, totalKw, upgradeGame } from '../src/game/reducer'
 import { ALL, GM, RuleError, ROLE_IDS } from '../src/game/types'
 import type { Action, GameState, PieceKind, Placement } from '../src/game/types'
 import { solveShield } from './solveShield'
@@ -269,6 +269,63 @@ describe('Landung', () => {
   })
 })
 
+describe('Ereignis 1: Antworten', () => {
+  const answer = (s: GameState, team: string, text: string, q = 0) => reduce(s, { type: 'e1Answer', q, text }, team, 5)
+
+  it('Antworten verschiedener Teams überschreiben sich nicht', () => {
+    let s = toPhase(setup(3), 'e1')
+    const [a, b] = [s.teams[1].id, s.teams[2].id]
+    s = answer(s, a, 'Antwort A')
+    s = answer(s, b, 'Antwort B')
+    expect(s.e1.answers[0]).toEqual({ [a]: 'Antwort A', [b]: 'Antwort B' })
+    s = answer(s, a, 'Antwort A korrigiert')
+    expect(s.e1.answers[0]).toEqual({ [a]: 'Antwort A korrigiert', [b]: 'Antwort B' })
+  })
+  it('Teams sehen nur ihre eigene Antwort, die Brücke sieht alle', () => {
+    let s = toPhase(setup(3), 'e1')
+    const [a, b] = [s.teams[1].id, s.teams[2].id]
+    s = answer(answer(s, a, 'Antwort A'), b, 'Antwort B')
+    expect(project(s, a).e1.answers[0]).toEqual({ [a]: 'Antwort A' })
+    expect(project(s, b).e1.answers[0]).toEqual({ [b]: 'Antwort B' })
+    expect(project(s, owner(s, 'LS')).e1.answers[0]).toEqual({ [a]: 'Antwort A', [b]: 'Antwort B' })
+  })
+  it('Spielstände mit dem alten Format bleiben lesbar', () => {
+    const s = toPhase(setup(3), 'e1')
+    const team = s.teams[1].id
+    const old = { ...s, e1: { ...s.e1, answers: { 2: { text: 'Alt', by: team } } } } as unknown as GameState
+    const up = upgradeGame(old)
+    expect(up.e1.answers[2]).toEqual({ [team]: 'Alt' })
+    expect(upgradeGame(up)).toBe(up)
+  })
+})
+
+describe('Ereignis 1: NO-GO', () => {
+  it('kostet 10 Minuten, informiert alle und die Brücke kann danach neu entscheiden', () => {
+    let s = toPhase(setup(3), 'e1')
+    const buffer = s.ship.timeBuffer
+    const bridge = owner(s, 'LS')
+    s = reduce(s, { type: 'e1Decide', go: false }, bridge, 5)
+    expect(s.ship.timeBuffer).toBe(buffer - 10)
+    expect(s.e1).toMatchObject({ decision: null, noGos: 1 })
+    expect(s.chat.at(-1)).toMatchObject({ kind: 'system', to: ALL })
+    expect(s.chat.at(-1)!.text).toContain('NO-GO')
+    expect(project(s, s.teams[1].id).e1.noGos).toBe(1)
+
+    s = reduce(s, { type: 'e1Answer', q: 0, text: 'Korrigiert' }, s.teams[1].id, 6)
+    s = reduce(s, { type: 'e1Decide', go: true }, bridge, 7)
+    expect(s.e1.decision).toBe('go')
+    expect(() => reduce(s, { type: 'e1Decide', go: false }, bridge, 8)).toThrow(RuleError)
+  })
+  it('nach einem NO-GO zeigt der Film den verspäteten Start', () => {
+    let s = toPhase(setup(3), 'e1')
+    s = { ...s, settings: { ...s.settings, cutscenes: true } }
+    const bridge = owner(s, 'LS')
+    s = reduce(s, { type: 'e1Decide', go: false }, bridge, 5)
+    s = reduce(s, { type: 'e1Decide', go: true }, bridge, 6)
+    expect(reduce(s, { type: 'advance' }, GM, 9).cutscene).toMatchObject({ title: 'Gestartet mit Verspätung', tone: 'warn' })
+  })
+})
+
 describe('Filme', () => {
   it('Start zeigt je nach Entscheidung den passenden Ausgang', () => {
     let s = toPhase(setup(7), 'e1')
@@ -287,13 +344,19 @@ describe('Filme', () => {
       s = reduce(s, { type: 'advance' }, GM, t * 1000)
       if (s.failure) s = reduce(s, { type: 'clearFailure' }, GM, t * 1000)
       seen.push(s.cutscene?.scene)
-      expect(s.cutscene!.id).toBe(t)
       expect(s.cutscene!.at).toBe(t * 1000)
+      const id = s.cutscene!.id
       s = reduce(s, { type: 'releaseCutscene' }, GM, t * 1000)
+      if (!s.cutscene!.released) {
+        seen.push(s.cutscene!.scene)
+        expect(s.cutscene!.id).toBe(id + 1)
+        s = reduce(s, { type: 'releaseCutscene' }, GM, t * 1000)
+      }
     }
     expect(seen).toContain('reactor')
     expect(seen.at(-1)).toBe('credits')
-    expect(seen).toHaveLength(10)
+    expect(seen).toHaveLength(11)
+    expect(seen.indexOf('impact')).toBe(seen.indexOf('launch') + 1)
   })
   it('Reaktor nennt die erreichte Last, Scheitern zeigt den Gefahrenfilm', () => {
     let s = toPhase(setup(7), 'e5')
@@ -314,6 +377,18 @@ describe('Filme', () => {
     expect(s.cutscene!.released).toBe(true)
     expect(s.phaseStartedAt).toBe(60_000) // Die Wartezeit zählt nicht zum Ereignis
     expect(reduce(s, { type: 'advance' }, GM, 61_000).cutscene).toMatchObject({ id: 2, released: false })
+  })
+  it('nach dem Start folgt der Einschlag, erst dessen Freigabe öffnet Ereignis 2', () => {
+    let s = toPhase(setup(3), 'e1')
+    s = { ...s, settings: { ...s.settings, cutscenes: true } }
+    s = reduce(s, { type: 'advance' }, GM, 1000)
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 30_000)
+    expect(s.phase).toBe('e2')
+    expect(s.cutscene).toMatchObject({ scene: 'impact', title: 'WIR SIND GETROFFEN – HÜLLENSCHADEN', tone: 'bad', released: false, at: 30_000 })
+    expect(() => reduce(s, { type: 'e2SendPlan' }, owner(s, 'LS'), 31_000)).toThrow(RuleError)
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 90_000)
+    expect(s.cutscene).toMatchObject({ scene: 'impact', released: true })
+    expect(s.phaseStartedAt).toBe(90_000)
   })
   it('Freigabe in einer Pause lässt die Uhr des Ereignisses bei null beginnen', () => {
     let s = reduce(setup(2, true), { type: 'advance' }, GM, 1000)

@@ -26,7 +26,9 @@ Das Spiel läuft unter **https://paul6552.github.io/Notfall-Krisenspiele/**. Jed
 
 Nach jedem „Weiter“ läuft bei allen gleichzeitig ein kurzer Film von 8 bis 18 Sekunden: vom Start der ARES 1 bis zur Landung auf dem Mars, am Schluss ein Abspann mit allen Organisationen. Der Ausgang hängt vom Spielverlauf ab, zum Beispiel „Erfolgreich gestartet“ oder „Gestartet mit Verspätung“.
 
-Die Filme sind im Browser animiert und brauchen keine Videodateien. Am Ende bleibt das Schlussbild stehen, bis die Spielleitung mit „Weiter für alle“ freigibt. Erst dann sehen alle das nächste Ereignis, und erst dann läuft dessen Uhr. Jede Person kann den Film für sich überspringen und landet dann ebenfalls beim Schlussbild. Die Spielleitung kann sie in der Lobby abschalten.
+Die Filme sind im Browser animiert und brauchen keine Videodateien. Nach dem Start folgt ein zweiter Film: Alarm, Meteoritenschauer und Treffer, die zum Hüllenschaden führen. Am Ende bleibt das Schlussbild stehen, bis die Spielleitung mit „Weiter für alle“ freigibt. Erst dann sehen alle das nächste Ereignis, und erst dann läuft dessen Uhr. Jede Person kann den Film für sich überspringen und landet dann ebenfalls beim Schlussbild. Die Spielleitung kann sie in der Lobby abschalten.
+
+Die Klänge entstehen im Browser, es gibt keine Audiodateien. Beim Beitritt wählt jedes Team „Musik und Klänge“, standardmäßig an. Im Film schaltet jede Person den Ton für das eigene Gerät um, die Spielleitung kann das nicht für andere festlegen. Browser spielen Ton erst nach einem Klick auf der Seite: Wer während eines Films neu lädt, hört ihn erst nach dem nächsten Klick.
 
 ### Wenn der Spielleiter-Browser zugeht
 

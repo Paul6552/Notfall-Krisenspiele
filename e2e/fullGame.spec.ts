@@ -280,15 +280,72 @@ test('Filme laufen bei allen gleichzeitig und hängen vom Spielverlauf ab', asyn
   await expect(teams[0].getByTestId('cutscene')).toContainText('auf dem Weg zum Mars')
 
   // Neuladen während des Films: läuft weiter und bleibt am Ende stehen, bis die Spielleitung freigibt
+  await teams[1].getByRole('button', { name: 'Musik ausschalten' }).click()
+  await expect(host.getByRole('button', { name: 'Musik ausschalten' })).toBeVisible() // Stumm gilt nur für das eigene Gerät
   await teams[1].reload()
   await expect(film).toBeVisible()
+  await expect(teams[1].getByRole('button', { name: 'Musik einschalten' })).toBeVisible()
   await expect(teams[1].getByTestId('cutscene-wait')).toBeVisible({ timeout: 20_000 })
   await expect(film).toContainText('Erfolgreich gestartet')
   await expect(host.getByRole('button', { name: /Weiter für alle – .*Hüllenschaden/ })).toBeVisible()
   await teams[1].waitForTimeout(1500)
   await expect(film).toBeVisible()
+  // Die Freigabe startet den zweiten Film, Ereignis 2 öffnet erst danach
+  await host.getByRole('button', { name: /Weiter für alle/ }).click()
+  await expect(film).toContainText('METEORITEN VORAUS')
+  await expect(host.getByTestId('cutscene')).toBeVisible()
+  await host.getByRole('button', { name: 'Überspringen' }).click()
+  await expect(host.getByTestId('cutscene')).toContainText('WIR SIND GETROFFEN')
   await release()
   await expect(teams[1].getByTestId('phase-title')).toHaveText(/Ereignis 2/)
+})
+
+test('Ereignis 1: Teams überschreiben sich die Antworten nicht', async ({ context }) => {
+  const { as, next } = await setup(context, 3)
+  await next(/Ereignis 1/)
+  const send = async (p: Page, text: string) => {
+    await p.getByLabel('Frage 1.').fill(text)
+    await p.locator('form.question').first().getByRole('button', { name: 'Senden' }).click()
+    await expect(p.getByText(`Gesendet: ${text}`)).toBeVisible()
+  }
+  const first = await as('S6')
+  await send(first, 'Antwort Team 2')
+  const second = await as('S1')
+  await send(second, 'Antwort Team 3')
+  await expect(first.getByText('Gesendet: Antwort Team 2')).toBeVisible()
+  await expect(first.getByText('Antwort Team 3')).toHaveCount(0)
+
+  const bridge = await as('LS')
+  await expect(bridge.getByText('Antwort Team 2', { exact: true })).toBeVisible()
+  await expect(bridge.getByText('Antwort Team 3', { exact: true })).toBeVisible()
+
+  // NO-GO gibt der Brücke und den Teams sichtbar Rückmeldung
+  await bridge.getByRole('button', { name: /^NO-GO/ }).click()
+  await expect(bridge.locator('.notice', { hasText: 'Startfenster verschoben' })).toBeVisible()
+  await expect(bridge.getByRole('button', { name: 'GO für den Start' })).toBeVisible()
+  const team = await as('S1')
+  await expect(team.locator('.notice', { hasText: 'Startfenster verschoben' })).toBeVisible()
+})
+
+test('Musik lässt sich beim Beitritt abwählen und im Film wieder einschalten', async ({ context }) => {
+  const page = await context.newPage()
+  await page.goto(`${NET}#/uebungen?teams=2`)
+  await page.getByRole('button', { name: 'Spiel starten' }).click()
+  const code = (await page.getByTestId('game-code').textContent())!
+  await page.getByLabel('Organisation vorab eintragen').fill('Vorab')
+  await page.getByRole('button', { name: 'Eintragen' }).click()
+  const team = await context.newPage()
+  await team.goto(`${NET}#/play/${code}`)
+  await team.getByLabel('Name eurer Organisation').fill('Org B')
+  await expect(team.getByLabel('Musik und Klänge')).toBeChecked()
+  await team.getByLabel('Musik und Klänge').uncheck()
+  await team.getByRole('button', { name: 'Beitreten' }).click()
+  await expect(team.getByText('Willkommen an Bord')).toBeVisible()
+  await page.getByRole('button', { name: 'Automatisch verteilen' }).click()
+  await page.getByRole('button', { name: 'Übung starten' }).click()
+  await expect(team.getByRole('button', { name: 'Musik einschalten' })).toBeVisible()
+  await team.getByRole('button', { name: 'Musik einschalten' }).click()
+  await expect(team.getByRole('button', { name: 'Musik ausschalten' })).toBeVisible()
 })
 
 test('Übungsübersicht erklärt, was beübt wird', async ({ page }) => {

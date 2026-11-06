@@ -1,5 +1,5 @@
 import { project } from '../game/projection'
-import { joinTeam, pauseAfterHostReturn, reduce, setHostTeam, setOnline, tick } from '../game/reducer'
+import { joinTeam, pauseAfterHostReturn, reduce, setHostTeam, setOnline, tick, upgradeGame } from '../game/reducer'
 import { GM, RuleError } from '../game/types'
 import type { Action, GameState } from '../game/types'
 import { saveGame } from '../storage/db'
@@ -22,7 +22,7 @@ export class HostSession {
 
   constructor(state: GameState) {
     // Nach einem Neuladen ist niemand verbunden, bis sich die Teams wieder melden.
-    const offline = { ...state, teams: state.teams.map((t) => ({ ...t, online: Boolean(t.isHost) })) }
+    const offline = { ...upgradeGame(state), teams: state.teams.map((t) => ({ ...t, online: Boolean(t.isHost) })) }
     this.state = pauseAfterHostReturn(offline, Date.now())
   }
 

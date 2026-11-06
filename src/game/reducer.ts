@@ -2,8 +2,9 @@ import {
   DEVICES, E1_QUESTIONS, E3_DIFFS, E3_MAP, E3_MAX_ENERGY, E3_STORM_SECTORS, E5_BONUS_KW, E5_LIMIT_KW, E5_START_KW,
   E6_DEFAULT_RESTART_SECONDS, E7_ATTEMPTS, E7_DELAY_SECONDS, GAME, LANDING_CODE, MODULES, PIECE_SPECS, ROLES, SECTOR_CODES,
   SECTOR_ORDER,
+  noGoText,
 } from './content/flugZumMars'
-import { cutsceneFor } from './content/cutscenes'
+import { cutsceneFor, followUpCutscene } from './content/cutscenes'
 import { isEmojiOnly } from './emoji'
 import { piecePolygon, shieldCoverage } from './geometry'
 import { ALL, GM, PHASES, ROLE_IDS, RuleError } from './types'
@@ -279,6 +280,18 @@ export function advanceWarnings(s: GameState): string[] {
  * Wird beim Öffnen eines gespeicherten Spiels aufgerufen. Die Zeit ohne Spielleiter zählt nicht:
  * Das Spiel steht ab dem letzten Lebenszeichen still, bis die Spielleitung fortsetzt.
  */
+/** Spielstände aus älteren Versionen hatten nur eine Antwort je Frage. */
+export function upgradeGame(state: GameState): GameState {
+  const old = Object.entries(state.e1.answers as Record<string, unknown>).filter(([, a]) => typeof (a as { by?: unknown }).by === 'string')
+  if (!old.length) return state
+  const s = structuredClone(state)
+  for (const [q, a] of old) {
+    const { text, by } = a as { text: string; by: string }
+    s.e1.answers[Number(q)] = { [by]: text }
+  }
+  return s
+}
+
 export function pauseAfterHostReturn(state: GameState, now: number): GameState {
   if (state.phase === 'lobby' || state.phase === 'done' || state.pausedAt) return state
   const s = structuredClone(state)
@@ -384,7 +397,7 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
     case 'releaseCutscene':
       needGm(actor)
       if (!s.cutscene || !held) break
-      s.cutscene.released = true
+      s.cutscene = followUpCutscene(s.cutscene, now) ?? { ...s.cutscene, released: true }
       // Die Uhr des Ereignisses läuft erst ab der Freigabe.
       s.phaseStartedAt = now
       s.pausedMs = 0
@@ -464,7 +477,7 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
       needPhase(s, 'e1')
       if (!E1_QUESTIONS[action.q]) throw new RuleError('Unbekannte Frage.')
       if (s.e1.decision) throw new RuleError('Die Brücke hat bereits entschieden.')
-      s.e1.answers[action.q] = { text: action.text.trim(), by: actor }
+      s.e1.answers[action.q] = { ...s.e1.answers[action.q], [actor]: action.text.trim() }
       break
     case 'e1Mark':
       need(s, actor, 'LS')
@@ -474,10 +487,16 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
     case 'e1Decide':
       need(s, actor, 'LS')
       needPhase(s, 'e1')
-      s.e1.decision = action.go ? 'go' : 'nogo'
-      log(s, now, action.go ? 'Die Brücke gibt GO für den Start.' : 'Die Brücke entscheidet NO-GO.', action.go ? 'good' : 'bad')
-      if (!action.go) hit(s, now, 'timeBuffer', -10, 'Startfenster verschoben: 10 Minuten Zeitpuffer verloren.')
-      if (!action.go) s.e1.decision = null
+      if (s.e1.decision) throw new RuleError('Die Brücke hat bereits entschieden.')
+      if (action.go) {
+        s.e1.decision = 'go'
+        log(s, now, 'Die Brücke gibt GO für den Start.', 'good')
+      } else {
+        s.e1.noGos = (s.e1.noGos ?? 0) + 1
+        log(s, now, 'Die Brücke entscheidet NO-GO.', 'bad')
+        hit(s, now, 'timeBuffer', -10, 'Startfenster verschoben: 10 Minuten Zeitpuffer verloren.')
+        system(s, now, noGoText(s.e1.noGos))
+      }
       break
     case 'e2SendPlan':
       need(s, actor, 'LS')

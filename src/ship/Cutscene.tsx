@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties } from 'react'
 import { E5_START_KW, ROLES } from '../game/content/flugZumMars'
 import { SHIELD_TARGET } from '../game/geometry'
 import { ROLE_IDS } from '../game/types'
 import type { Cutscene, CutsceneScene, RoleId } from '../game/types'
+import { IMPACT_HITS, isMuted, playFilm, setMuted, subscribeMuted } from './filmSound'
 import './cutscene.css'
 
 function Rocket({ flame = false }: { flame?: boolean }) {
@@ -39,6 +40,15 @@ const ASTEROIDS = [
   [12, 0, 9, 70], [32, 2.2, 7, 110], [58, 1, 8, 54], [76, 3.1, 6.5, 90], [22, 4.4, 7.5, 60], [66, 5, 8.5, 80], [46, 6, 6, 120], [86, 0.6, 9, 50],
 ]
 
+// Oben und unten am Schiff vorbei: Oberkante, Start, Dauer, Dicke
+const METEORS = Array.from({ length: 28 }, (_, i) => [
+  i % 2 ? 68 + ((i * 7) % 22) : 10 + ((i * 11) % 24),
+  8.2 + i * 0.2,
+  1 + (i % 4) * 0.18,
+  20 + ((i * 17) % 34),
+])
+const HITS = IMPACT_HITS
+
 function ReactorCounter({ kw, held }: { kw: number; held: boolean }) {
   const [value, setValue] = useState(E5_START_KW)
   useEffect(() => {
@@ -67,6 +77,10 @@ function Credits({ teams, roleOwner, title, subtitle, seconds }: Props & { title
         </div>
       ))}
       <h2>{subtitle}</h2>
+      <div className="c-credit">
+        <span>Entwickler</span>
+        <strong>Christoph Paul Pedretscher</strong>
+      </div>
     </div>
   )
 }
@@ -91,6 +105,27 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
         {['3', '2', '1'].map((n, i) => <div key={n} className="c-count" style={{ animationDelay: `${0.3 + i}s` }}>{n}</div>)}
         <div className="c-ship c-launching"><Rocket flame /></div>
         {[-15, -5, 5, 15].map((x) => <i key={x} className="c-smoke" style={{ left: `calc(50% + ${x}vh)`, animationDelay: `${3.1 + Math.abs(x) / 50}s` }} />)}
+      </>
+    ),
+    impact: (
+      <>
+        <div className="c-shakebox">
+          <Stars />
+          {METEORS.map(([top, delay, dur, size], i) => <i key={i} className="c-meteor" style={{ top: `${top}%`, width: size * 3.4, height: size, animationDelay: `${delay}s`, animationDuration: `${dur}s` }} />)}
+          {HITS.map((t, i) => <i key={i} className="c-micro" style={{ top: `${49 + (i % 3) * 2}%`, animationDelay: `${t - 0.4}s` }} />)}
+          <div className="c-ship c-hitship">
+            <Rocket flame />
+            {HITS.map((t, i) => <i key={i} className="c-hit" style={{ top: `${22 + i * 13}%`, left: `${i % 2 ? 66 : 34}%`, animationDelay: `${t}s` }} />)}
+            {[0, 1, 2].map((i) => <i key={i} className="c-leak" style={{ animationDelay: `${15.2 + i * 0.7}s` }} />)}
+          </div>
+        </div>
+        <div className="c-reds">
+          <i className="c-redglow" />
+          {['tl', 'tr', 'bl', 'br'].map((p) => <i key={p} className={`c-beacon ${p}`} />)}
+        </div>
+        <div className="c-msg c-alarmword">ALARM</div>
+        <div className="c-msg c-ahead">METEORITEN VORAUS</div>
+        <div className="c-msg c-hold"><strong>Ausweichen unmöglich.</strong><span>Wir können nichts tun. Durchhaltet!</span></div>
       </>
     ),
     repair: (
@@ -155,7 +190,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
 }
 
 const CAPTION_AT: Record<CutsceneScene, number> = {
-  intro: 2.5, prep: 3, launch: 10.5, repair: 6, asteroids: 7.5, signal: 5.5, reactor: 6, restart: 6, landing: 9.5, failure: 2.5, credits: 0,
+  intro: 2.5, prep: 3, launch: 10.5, impact: 16, repair: 6, asteroids: 7.5, signal: 5.5, reactor: 6, restart: 6, landing: 9.5, failure: 2.5, credits: 0,
 }
 
 interface Props {
@@ -176,6 +211,7 @@ interface OverlayProps extends Props {
 export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRelease, nextTitle, hostLost = false }: OverlayProps) {
   const [finished, setFinished] = useState(0)
   const skip = useRef<HTMLButtonElement>(null)
+  const muted = useSyncExternalStore(subscribeMuted, isMuted)
   const id = cutscene?.id ?? 0
   const expired = cutscene ? Date.now() + offset - cutscene.at >= cutscene.seconds * 1000 : true
   const active = Boolean(cutscene) && !cutscene?.released
@@ -186,14 +222,21 @@ export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRele
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
     const left = cutscene.at + cutscene.seconds * 1000 - (Date.now() + offset)
     const timer = setTimeout(() => setFinished(id), reduced ? Math.min(left, 5000) : left)
-    skip.current?.focus()
     return () => clearTimeout(timer)
   }, [playing, id, cutscene, offset])
+
+  // Nur am Filmanfang: Der Spielstand wird laufend neu verteilt, das darf den Ton nicht neu starten.
+  useEffect(() => {
+    if (!playing || !cutscene) return
+    skip.current?.focus()
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+    return playFilm(cutscene, () => (Date.now() + offset - cutscene.at) / 1000, CAPTION_AT[cutscene.scene], reduced)
+  }, [playing, id])
 
   if (!active || !cutscene) return null
   const credits = cutscene.scene === 'credits'
   return (
-    <div className={`cut cut-${cutscene.scene}${playing ? '' : ' held'}`} role="dialog" aria-label={`Film: ${cutscene.title}`} data-testid="cutscene">
+    <div key={cutscene.id} className={`cut cut-${cutscene.scene}${playing ? '' : ' held'}`} role="dialog" aria-label={`Film: ${cutscene.title}`} data-testid="cutscene">
       <Stage c={cutscene} teams={teams} roleOwner={roleOwner} held={!playing} />
       {!credits && (
         <div className={`c-caption ${cutscene.tone}`} style={{ animationDelay: `${CAPTION_AT[cutscene.scene]}s` }}>
@@ -201,6 +244,9 @@ export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRele
           <p>{cutscene.subtitle}</p>
         </div>
       )}
+      <button className="c-skip c-mute" aria-pressed={muted} onClick={() => setMuted(!muted)}>
+        <span aria-hidden>{muted ? '🔇' : '🔊'}</span> Musik {muted ? 'einschalten' : 'ausschalten'}
+      </button>
       {playing && <button ref={skip} className="c-skip" onClick={() => setFinished(id)}>Überspringen</button>}
       {!playing && (
         <div className="c-wait" data-testid="cutscene-wait">
