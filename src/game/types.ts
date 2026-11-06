@@ -25,7 +25,7 @@ export interface Settings {
   cutscenes: boolean
 }
 
-export type CutsceneScene = 'intro' | 'prep' | 'launch' | 'impact' | 'repair' | 'asteroids' | 'signal' | 'reactor' | 'restart' | 'landing' | 'failure' | 'credits'
+export type CutsceneScene = 'intro' | 'prep' | 'launch' | 'impact' | 'repair' | 'asteroids' | 'dish' | 'signal' | 'reactor' | 'restart' | 'landing' | 'failure' | 'credits'
 
 export interface Cutscene {
   id: number

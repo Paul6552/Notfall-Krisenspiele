@@ -355,7 +355,8 @@ describe('Filme', () => {
     }
     expect(seen).toContain('reactor')
     expect(seen.at(-1)).toBe('credits')
-    expect(seen).toHaveLength(11)
+    expect(seen).toHaveLength(12)
+    expect(seen.indexOf('dish')).toBe(seen.indexOf('asteroids') + 1)
     expect(seen.indexOf('impact')).toBe(seen.indexOf('launch') + 1)
   })
   it('Reaktor nennt die erreichte Last, Scheitern zeigt den Gefahrenfilm', () => {
@@ -389,6 +390,17 @@ describe('Filme', () => {
     s = reduce(s, { type: 'releaseCutscene' }, GM, 90_000)
     expect(s.cutscene).toMatchObject({ scene: 'impact', released: true })
     expect(s.phaseStartedAt).toBe(90_000)
+  })
+  it('nach dem Asteroidenfeld fällt die Schüssel aus, erst deren Freigabe öffnet Ereignis 4', () => {
+    let s = toPhase(setup(3), 'e3')
+    s = { ...s, settings: { ...s.settings, cutscenes: true } }
+    s = reduce(s, { type: 'advance' }, GM, 1000)
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 20_000)
+    expect(s.phase).toBe('e4')
+    expect(s.cutscene).toMatchObject({ scene: 'dish', title: 'Kommunikationskanal ausgefallen', tone: 'bad', released: false })
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 50_000)
+    expect(s.cutscene).toMatchObject({ scene: 'dish', released: true })
+    expect(s.phaseStartedAt).toBe(50_000)
   })
   it('Freigabe in einer Pause lässt die Uhr des Ereignisses bei null beginnen', () => {
     let s = reduce(setup(2, true), { type: 'advance' }, GM, 1000)

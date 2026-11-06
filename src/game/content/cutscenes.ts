@@ -2,7 +2,7 @@
 import type { Cutscene, CutsceneScene, GameState, Phase } from '../types'
 
 const SECONDS: Record<CutsceneScene, number> = {
-  intro: 9, prep: 8, launch: 15, impact: 21, repair: 11, asteroids: 12, signal: 10, reactor: 11, restart: 11, landing: 14, failure: 9, credits: 18,
+  intro: 9, prep: 8, launch: 24, impact: 21, repair: 11, asteroids: 12, dish: 14, signal: 10, reactor: 11, restart: 11, landing: 14, failure: 9, credits: 18,
 }
 
 type Script = Pick<Cutscene, 'scene' | 'title' | 'subtitle' | 'tone' | 'kw'>
@@ -46,13 +46,15 @@ function script(from: Phase, s: GameState, kw: number): Script | null {
   }
 }
 
+const FOLLOW_UPS: Partial<Record<CutsceneScene, Script>> = {
+  launch: { scene: 'impact', title: 'WIR SIND GETROFFEN – HÜLLENSCHADEN', subtitle: 'Wir brauchen umgehend Reparatur!', tone: 'bad' },
+  asteroids: { scene: 'dish', title: 'Kommunikationskanal ausgefallen', subtitle: 'Die Satellitenschüssel ist zerstört.', tone: 'bad' },
+}
+
 /** Manche Filme ziehen nach der Freigabe einen zweiten nach sich. */
 export function followUpCutscene(c: Cutscene, at: number): Cutscene | null {
-  if (c.scene !== 'launch') return null
-  return {
-    id: c.id + 1, at, seconds: SECONDS.impact, released: false, scene: 'impact', tone: 'bad',
-    title: 'WIR SIND GETROFFEN – HÜLLENSCHADEN', subtitle: 'Wir brauchen umgehend Reparatur!',
-  }
+  const next = FOLLOW_UPS[c.scene]
+  return next ? { ...next, id: c.id + 1, at, seconds: SECONDS[next.scene], released: false } : null
 }
 
 export function cutsceneFor(from: Phase, s: GameState, kw: number, at: number, id: number): Cutscene | null {

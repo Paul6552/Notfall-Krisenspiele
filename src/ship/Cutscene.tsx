@@ -4,7 +4,7 @@ import { E5_START_KW, ROLES } from '../game/content/flugZumMars'
 import { SHIELD_TARGET } from '../game/geometry'
 import { ROLE_IDS } from '../game/types'
 import type { Cutscene, CutsceneScene, RoleId } from '../game/types'
-import { IMPACT_HITS, isMuted, playFilm, setMuted, subscribeMuted } from './filmSound'
+import { COUNTDOWN, COUNTDOWN_STEP, DISH_HIT, IMPACT_HITS, countdownAt, isMuted, playFilm, setMuted, subscribeMuted } from './filmSound'
 import './cutscene.css'
 
 function Rocket({ flame = false }: { flame?: boolean }) {
@@ -102,9 +102,9 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
         <div className="c-day" />
         <div className="c-limb" />
         <Pad />
-        {['3', '2', '1'].map((n, i) => <div key={n} className="c-count" style={{ animationDelay: `${0.3 + i}s` }}>{n}</div>)}
+        {COUNTDOWN.map((n, i) => <div key={n} className="c-count" style={{ animationDelay: `${countdownAt(i)}s`, animationDuration: `${COUNTDOWN_STEP}s` }}>{n}</div>)}
         <div className="c-ship c-launching"><Rocket flame /></div>
-        {[-15, -5, 5, 15].map((x) => <i key={x} className="c-smoke" style={{ left: `calc(50% + ${x}vh)`, animationDelay: `${3.1 + Math.abs(x) / 50}s` }} />)}
+        {[-15, -5, 5, 15].map((x) => <i key={x} className="c-smoke" style={{ left: `calc(50% + ${x}vh)`, animationDelay: `${11.7 + Math.abs(x) / 50}s` }} />)}
       </>
     ),
     impact: (
@@ -149,6 +149,45 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
         <div className="c-glitch" />
       </>
     ),
+    dish: (
+      <>
+        <div className="c-dishshake">
+          <Stars />
+          <div className="c-ship c-dishfly"><Rocket flame /></div>
+          <div className="c-closeup">
+            <svg viewBox="0 0 400 300" aria-hidden>
+              <path d="M-900 330 Q200 170 1300 330 V1400 H-900 Z" fill="#aab6c2" />
+              <path d="M-900 345 Q200 185 1300 345" fill="none" stroke="#7d8c9a" strokeWidth="3" />
+              {[-160, -40, 80, 320, 440, 560].map((x) => <line key={x} x1={x} y1="225" x2={x} y2="300" stroke="#8b99a7" strokeWidth="2" />)}
+              <rect x="176" y="238" width="48" height="14" rx="3" fill="#5a6876" />
+              <g className="c-dishwhole">
+                <rect x="193" y="130" width="14" height="112" fill="#6d7b89" />
+                <g transform="rotate(25 200 120)">
+                  <path d="M136 84 Q200 196 264 84 Z" fill="#dfe6ec" stroke="#8a98a6" strokeWidth="3" />
+                  <line x1="200" y1="138" x2="200" y2="66" stroke="#6d7b89" strokeWidth="4" />
+                  <circle cx="200" cy="62" r="7" fill="#f2b544" />
+                </g>
+              </g>
+              <g className="c-dishwhole">{[0, 1, 2].map((i) => <circle key={i} cx="232" cy="66" r="24" className="c-dishwave" style={{ animationDelay: `${4.3 + i * 0.45}s` }} />)}</g>
+              <g className="c-dishbroken">
+                <path d="M193 242 V186 L199 176 L203 188 L207 180 V242 Z" fill="#6d7b89" />
+                <path d="M186 186 Q176 214 214 214 L206 190 Z" fill="#c3ccd5" stroke="#8a98a6" strokeWidth="3" />
+                <circle cx="201" cy="180" r="5" className="c-dishspark" />
+              </g>
+              {[[-90, -80], [80, -110], [130, 20], [-120, 30], [20, -140]].map(([dx, dy], i) => (
+                <polygon key={i} points="192,112 214,106 208,132" className="c-dishfrag" style={{ '--dx': `${dx}px`, '--dy': `${dy}px` } as CSSProperties} />
+              ))}
+              <g className="c-dishrock">
+                <path d="M200 120 L262 88 L250 124 Z" fill="#ff8a3d" opacity=".7" />
+                <circle cx="200" cy="120" r="14" fill="#7a6a5c" />
+              </g>
+              <circle cx="200" cy="120" r="30" className="c-dishflash" />
+            </svg>
+          </div>
+        </div>
+        <div className="c-reds" style={{ animationDelay: `${DISH_HIT + 0.3}s` }}><i className="c-redglow" /></div>
+      </>
+    ),
     signal: (
       <>
         <Stars />
@@ -190,7 +229,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
 }
 
 const CAPTION_AT: Record<CutsceneScene, number> = {
-  intro: 2.5, prep: 3, launch: 10.5, impact: 16, repair: 6, asteroids: 7.5, signal: 5.5, reactor: 6, restart: 6, landing: 9.5, failure: 2.5, credits: 0,
+  intro: 2.5, prep: 3, launch: 19.1, impact: 16, repair: 6, asteroids: 7.5, dish: 10, signal: 5.5, reactor: 6, restart: 6, landing: 9.5, failure: 2.5, credits: 0,
 }
 
 interface Props {

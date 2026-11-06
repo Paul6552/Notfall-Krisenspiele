@@ -285,7 +285,7 @@ test('Filme laufen bei allen gleichzeitig und hängen vom Spielverlauf ab', asyn
   await teams[1].reload()
   await expect(film).toBeVisible()
   await expect(teams[1].getByRole('button', { name: 'Musik einschalten' })).toBeVisible()
-  await expect(teams[1].getByTestId('cutscene-wait')).toBeVisible({ timeout: 20_000 })
+  await expect(teams[1].getByTestId('cutscene-wait')).toBeVisible({ timeout: 30_000 })
   await expect(film).toContainText('Erfolgreich gestartet')
   await expect(host.getByRole('button', { name: /Weiter für alle – .*Hüllenschaden/ })).toBeVisible()
   await teams[1].waitForTimeout(1500)
