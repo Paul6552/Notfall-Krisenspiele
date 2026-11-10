@@ -29,7 +29,9 @@ export function project(s: GameState, viewer: string): View {
   }
 
   if (at('e3')) {
-    if (has('LS')) docs.e3Map = E3_MAP.map((row) => (s.e3.stormKnown || gm ? row : row.replaceAll('~', '.')))
+    // Die Brücke sieht nur die Sektoren, die das Labor gemeldet hat. Die Spielleitung sieht alle.
+    const shown = s.e3.stormReport ?? []
+    if (has('LS')) docs.e3Map = E3_MAP.map((row) => (gm ? row : row.replace(/[A-F]/g, (c) => (shown.includes(c) ? c : '.'))))
     if (has('S2')) docs.e3Sensors = E3_SENSORS
   }
 

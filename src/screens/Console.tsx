@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { PHASE_INFO, ROLES, SECTOR_ORDER, roleLabel } from '../game/content/flugZumMars'
+import { E3_DIFFS, E3_STORM_SECTORS, PHASE_INFO, ROLES, SECTOR_ORDER, roleLabel } from '../game/content/flugZumMars'
 import { Lessons } from '../events/Lessons'
 import { project } from '../game/projection'
-import { advanceWarnings } from '../game/reducer'
+import { advanceWarnings, stormReportCorrect } from '../game/reducer'
 import { GM, PHASES, ROLE_IDS } from '../game/types'
 import type { Action, GameState, ShipStatus, View } from '../game/types'
 import { ShipScene } from '../ship/Ship'
 import { Chat } from './Chat'
-import { Banners, RoleWorkspace, StatusBar } from './GameRoom'
+import { Banners, HitAlert, RoleWorkspace, StatusBar } from './GameRoom'
 import { Notice } from './shared'
 
 const download = (state: GameState) => {
@@ -19,11 +19,18 @@ const download = (state: GameState) => {
   URL.revokeObjectURL(url)
 }
 
+const labReport = (report: string[] | null) =>
+  !report
+    ? `Labor-Meldung: noch keine (richtig wären ${E3_STORM_SECTORS.join(', ')})`
+    : stormReportCorrect(report)
+      ? `Labor-Meldung: ${report.join(', ')} – richtig ✅`
+      : `Labor-Meldung: ${report.join(', ')} – falsch ❌ (richtig wären ${E3_STORM_SECTORS.join(', ')})`
+
 function progress(view: View, state: GameState): string[] {
   switch (view.phase) {
     case 'e1': return [`Beantwortete Fragen: ${Object.keys(state.e1.answers).length} von 5`, `Entscheidung: ${state.e1.decision ?? 'offen'}`]
     case 'e2': return [`Bauplan gesendet: ${state.e2.planSent ? 'ja' : 'nein'}`, `Geliefert: ${Object.keys(state.e2.built).length} von 14`, `Eingebaut: ${Object.keys(state.e2.placed).length} von 14`, `Repariert: ${state.e2.repaired ? 'ja' : 'nein'}`]
-    case 'e3': return [`Position: Spalte ${state.e3.pos.x + 1}, Zeile ${state.e3.pos.y + 1}`, `Kollisionen: ${state.e3.collisions}`, `Sturmfelder: ${state.e3.stormHits}`, `Durchquert: ${state.e3.arrived ? 'ja' : 'nein'}`, `Sturm bekannt: ${state.e3.stormKnown ? 'ja' : 'nein'}`, `Funkmast: ${state.e3.found.mast.length} von 6`, `Schaltpult: ${state.e3.found.panel.length} von 6`]
+    case 'e3': return [`Position: Spalte ${state.e3.pos.x + 1}, Zeile ${state.e3.pos.y + 1}`, `Kollisionen: ${state.e3.collisions}`, `Sturmfelder: ${state.e3.stormHits}`, `Durchquert: ${state.e3.arrived ? 'ja' : 'nein'}`, labReport(state.e3.stormReport), `Funkmast: ${state.e3.found.mast.length} von ${E3_DIFFS.mast.length}`, `Schaltpult: ${state.e3.found.panel.length} von ${E3_DIFFS.panel.length}`, `Crew-Meldung per Funk: ${state.e3.emojiStatement ? 'ja' : 'nein'}`]
     case 'e4': return [`Notkanal: ${state.comms.net === 'backup' ? 'aktiv' : 'nicht aktiv'}`, `Angemeldet: ${state.e4.checkedIn.length} von ${state.teams.length}`]
     case 'e5': return [`Abgeschaltete Geräte: ${state.e5.off.length}`, `Bestätigt: ${state.e5.confirmed ? 'ja' : 'nein'}`]
     case 'e6': return [`Neustart: ${state.e6.done ? 'fertig' : state.comms.silence ? 'läuft' : 'nicht gestartet'}`, `Unterbrechungen: ${state.e6.interrupts}`]
@@ -75,6 +82,7 @@ export function Console({ state, act, error }: { state: GameState; act: (a: Acti
   return (
     <div className="room-layout console">
       <StatusBar view={view} />
+      <HitAlert view={view} />
       <aside className="ship-col">
         <ShipScene
           teams={state.teams}

@@ -4,7 +4,7 @@ import { E5_LIMIT_KW, E5_START_KW, ROLES } from '../game/content/flugZumMars'
 import { SHIELD_TARGET } from '../game/geometry'
 import { ROLE_IDS } from '../game/types'
 import type { Cutscene, CutsceneScene, RoleId } from '../game/types'
-import { COUNTDOWN, COUNTDOWN_STEP, DISH_HIT, IMPACT_HITS, STORM_INSIDE, STORM_SURGE, TOUCHDOWN, countdownAt, isMuted, playAmbient, playFilm, setMuted, subscribeSound } from './filmSound'
+import { COUNTDOWN, COUNTDOWN_STEP, DISH_HIT, IMPACT_HITS, STORM_INSIDE, STORM_SURGE, STORM_ZOOM, TOUCHDOWN, countdownAt, isMuted, playAmbient, playFilm, setMuted, subscribeSound } from './filmSound'
 import './cutscene.css'
 
 /** `float` lässt das Schiff im All sanft treiben, auch im Wartebild. */
@@ -237,6 +237,8 @@ function Stage({ c, teams, roleOwner, held, jump }: { c: Cutscene; held: boolean
     ),
     storm: (
       <>
+        {/* Von außen: Der Sturm trifft die ARES 1, dann zoomt das Bild auf das Schiff. */}
+        <div className="c-stormout" style={{ animationDelay: `${STORM_ZOOM}s` }}>
         <Stars />
         <div className="c-stormsun" />
         {[3, 3.7, 4.4, 5.1, 5.8, 6.5, 7.2].map((t) => <i key={t} className="c-wave" style={{ animationDelay: `${t}s` }} />)}
@@ -251,9 +253,16 @@ function Stage({ c, teams, roleOwner, held, jump }: { c: Cutscene; held: boolean
             <polyline points="60,70 46,92 62,120 44,146 60,170" />
           </svg>
         </div>
+        <i className="c-shipring" style={{ animationDelay: `${STORM_ZOOM}s` }} />
+        </div>
+        <div className="c-shiplabel" style={{ animationDelay: `${STORM_ZOOM + 0.2}s` }}>
+          <strong>ARES 1</strong>
+          <span>An Bord: Kommunikationsserver</span>
+        </div>
         <i className="c-stormflash" />
         {/* Schnitt ins Schiff: Der Sturm legt die Kommunikationsserver lahm. */}
         <div className="c-deck c-serverroom" style={{ animationDelay: `${STORM_INSIDE}s` }}>
+          <p className="c-roomsign">ARES 1 · Serverraum Kommunikation</p>
           <svg viewBox="0 0 640 360" aria-hidden>
             <path d="M-500 340 H1140 V900 H-500 Z" fill="#141a20" />
             {[30, 150, 270, 390, 510].map((x, rack) => (
@@ -451,7 +460,7 @@ function Stage({ c, teams, roleOwner, held, jump }: { c: Cutscene; held: boolean
 }
 
 const CAPTION_AT: Record<CutsceneScene, number> = {
-  intro: 2.5, prep: 3, control: 11, launch: 19.1, impact: 16, repair: 6, storm: 19, asteroids: 7.5, dish: 10, signal: 5.5, overload: 17.4, reactor: 6, restart: 6, bridge: 12.5, landing: 9.5, failure: 2.5, credits: 0,
+  intro: 2.5, prep: 3, control: 11, launch: 19.1, impact: 16, repair: 6, storm: 21, asteroids: 7.5, dish: 10, signal: 5.5, overload: 17.4, reactor: 6, restart: 6, bridge: 12.5, landing: 9.5, failure: 2.5, credits: 0,
 }
 
 interface Props {

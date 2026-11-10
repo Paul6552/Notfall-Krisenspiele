@@ -28,15 +28,24 @@ Nach jedem „Weiter“ läuft bei allen gleichzeitig ein kurzer Film von 9 bis 
 
 Die Filme sind im Browser animiert und brauchen keine Videodateien. Manche Übergänge haben zwei Filme hintereinander:
 
-- Vor Ereignis 1 fordert die Flugkontrolle die letzte Überprüfung an.
+- Beim Start in den Check-in läuft noch kein Film, damit sich erst alle einloggen. Verlässt die Spielleitung den Check-in, laufen nacheinander der Titelfilm, die Startvorbereitung und die Flugkontrolle, die die letzte Überprüfung anfordert.
 - Nach dem Start folgen Alarm, Meteoritenschauer und die Treffer, die zum Hüllenschaden führen.
-- Vor Ereignis 3 trifft der Sonnen-Ionensturm das Schiff. Derselbe Film zeigt, wie der Sturm die Kommunikationsserver lahmlegt.
+- Vor Ereignis 3 trifft der Sonnen-Ionensturm das Schiff. Dann zoomt das Bild auf die ARES 1 („An Bord: Kommunikationsserver“) und schneidet in ihren Serverraum, wo der Sturm die Server lahmlegt.
 - Vor Ereignis 4 trifft ein Meteorit die Satellitenschüssel, vor Ereignis 5 steigt der Reaktor auf 410 kW, vor Ereignis 7 wartet die nervöse Crew auf der Brücke.
 - Nach der Landung feiert die Crew. Danach rückt die ARES 1 zur Seite und der Abspann mit allen Organisationen läuft. Erst dann beginnt „Lessons Learned“.
 
 Am Ende jedes Films läuft das Schlussbild weiter: Triebwerke brennen, Sterne ziehen vorbei, dazu spielt leise Grundmusik. Das bleibt so, bis die Spielleitung mit „Weiter für alle“ freigibt. Erst dann sehen alle das nächste Ereignis, und erst dann läuft dessen Uhr. Zwischen zwei Filmen bleibt das Bild dunkel, das Spiel ist dabei nicht zu sehen. Jede Person kann den Film für sich überspringen und landet dann ebenfalls beim Schlussbild. Die Spielleitung kann die Filme in der Lobby abschalten.
 
-Musik und Klänge entstehen im Browser, es gibt keine Audiodateien. Ein wiederkehrendes Thema verbindet die Filme. Vor dem Spiel prüft jede Person den Ton mit „Musik testen“: beim Beitritt, im Warteraum und in der Lobby der Spielleitung. Dort und in jedem Film lässt sich die Musik für das eigene Gerät ein- und ausschalten, die Spielleitung kann das nicht für andere festlegen. Die Lautstärke regelt jede Person am Betriebssystem. Browser spielen Ton erst nach einem Klick auf der Seite: Wer während eines Films neu lädt, hört ihn erst nach dem nächsten Klick.
+Musik und Klänge entstehen im Browser, es gibt keine Audiodateien. Die Musik ist bewusst hell gehalten: C-Dur, Flächen, Arpeggien, Glockenspiel und ein leichter Rhythmus. Auch Gefahr klingt nach Abenteuer und Tempo, nicht nach Dunkelheit. Ein wiederkehrendes Thema verbindet die Filme. Vor dem Spiel prüft jede Person den Ton mit „Musik testen“: beim Beitritt, im Warteraum und in der Lobby der Spielleitung. Dort und in jedem Film lässt sich die Musik für das eigene Gerät ein- und ausschalten, die Spielleitung kann das nicht für andere festlegen. Die Lautstärke regelt jede Person am Betriebssystem. Browser spielen Ton erst nach einem Klick auf der Seite: Wer während eines Films neu lädt, hört ihn erst nach dem nächsten Klick.
+
+### Ereignis 3: Ionensturm und Asteroidenfeld
+
+- **Brücke** sieht als Einzige die Karte. Sie gibt Antrieb die Richtung und Versorgung die Zahl der Felder, beides nur per Emoji.
+- **Versorgung** lädt den Schub mit +1, +3 oder +5 Energie, auch kombiniert. **Antrieb** zündet ihn mit einem Klick, und das Schiff fliegt genau so viele Felder in die gewählte Richtung. Ein Schub, der aus dem Feld führen würde, wird abgelehnt und kostet nichts.
+- **Labor** wertet die Sensordaten aus und meldet die Sturmsektoren (A bis F). Die Brücke sieht die gemeldeten Sektoren violett, ob die Meldung stimmt oder nicht. Das Labor kann die Meldung korrigieren. Ob sie stimmt, sieht nur die Spielleitung: in der Konsole unter dem Briefing und in der Brückenkarte unter „Rollenansichten und Lösungen“.
+- **Asteroid getroffen:** Hülle −5 %, alle sehen einen roten Rahmen mit dem Hinweis. **Sturmfeld:** Das Schiff bleibt im ersten Sturmfeld stehen, der restliche Schub ist verloren, Moral −3 %, alle sehen einen violetten Rahmen.
+- **Funkmast und Schaltpult:** Suchbilder mit je 9 kleinen Abweichungen. Ein Fehlklick sperrt das Bild für 4 Sekunden. Sind alle Schäden gefunden, kann der Funkmast wieder repariert werden.
+- **Kommunikationsdeck** informiert die Crew mit einer Emoji-Meldung über den Funk rechts an „Alle“.
 
 ### Konsole der Spielleitung
 

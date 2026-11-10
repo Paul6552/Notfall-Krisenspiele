@@ -1,5 +1,5 @@
 import {
-  DEVICES, E1_QUESTIONS, E3_DIFFS, E3_MAP, E3_MAX_ENERGY, E3_STORM_SECTORS, E5_BONUS_KW, E5_LIMIT_KW, E5_START_KW,
+  DEVICES, E1_QUESTIONS, E3_DIFFS, E3_MAP, E3_MAX_ENERGY, E3_SECTOR_IDS, E3_STORM_SECTORS, E5_BONUS_KW, E5_LIMIT_KW, E5_START_KW,
   E6_DEFAULT_RESTART_SECONDS, E7_ATTEMPTS, E7_DELAY_SECONDS, GAME, LANDING_CODE, MODULES, PIECE_SPECS, ROLES, SECTOR_CODES,
   SECTOR_ORDER,
   noGoText,
@@ -50,7 +50,7 @@ export function createGame(opts: { code: string; teamCount: number; now: number;
     e2: { cipherShift: 3 + Math.floor(Math.random() * 20), planSent: false, built: {}, placed: {}, repaired: false },
     e3: {
       pos: startPos(), trail: [], energy: 0, energyUsed: 0, collisions: 0, stormHits: 0, arrived: false,
-      stormKnown: false, sectorTries: 0, found: { mast: [], panel: [] }, emojiStatement: false,
+      stormReport: null, lastHit: null, sectorTries: 0, found: { mast: [], panel: [] }, emojiStatement: false,
     },
     e4: { checkedIn: [], penaltyApplied: false },
     e5: { off: [], confirmed: false },
@@ -153,6 +153,18 @@ export function setHostTeam(state: GameState, name: string, random: () => number
   return s
 }
 
+const sectorList = (list: string[]) => (list.length === 1 ? `Sektor ${list[0]}` : `den Sektoren ${list.slice(0, -1).join(', ')} und ${list[list.length - 1]}`)
+
+/** Hat das Labor genau die Sturmsektoren gemeldet? */
+export const stormReportCorrect = (report: string[] | null) =>
+  Boolean(report && report.length === E3_STORM_SECTORS.length && E3_STORM_SECTORS.every((x) => report.includes(x)))
+
+function crewInformed(s: GameState, now: number) {
+  if (s.e3.emojiStatement) return
+  s.e3.emojiStatement = true
+  hit(s, now, 'morale', 5, 'Kommunikationsdeck informiert die Crew trotz Ionensturm.')
+}
+
 function enterPhase(s: GameState, now: number) {
   s.phaseStartedAt = now
   s.pausedMs = 0
@@ -160,11 +172,10 @@ function enterPhase(s: GameState, now: number) {
   if (s.phase === 'e3') s.comms.emojiOnly = true
   if (s.phase === 'e4') {
     s.comms.net = 'down'
-    const { collisions, stormHits } = s.e3
-    if (collisions + stormHits > 0 && !s.e4.penaltyApplied) {
+    const { collisions } = s.e3
+    if (collisions > 0 && !s.e4.penaltyApplied) {
       s.e4.penaltyApplied = true
       if (collisions) hit(s, now, 'timeBuffer', -5 * collisions, `Kursstrafe: ${collisions} Kollisionen kosten ${5 * collisions} Minuten Zeitpuffer.`)
-      if (stormHits) hit(s, now, 'morale', -3 * stormHits, `Kursstrafe: ${stormHits} Sturmfelder senken die Moral.`)
     }
   }
 }
@@ -250,6 +261,8 @@ export function advanceWarnings(s: GameState): string[] {
     case 'e3':
       if (!s.e3.arrived) list.push('Das Schiff hat das Asteroidenfeld nicht durchquert: −20 Hülle.')
       if (s.e3.found.mast.length < E3_DIFFS.mast.length) list.push('Der Funkmast ist nicht vollständig geprüft: −5 Minuten Zeitpuffer.')
+      if (!s.e3.stormReport) list.push('Das Labor hat noch keine Sturmsektoren gemeldet.')
+      else if (!stormReportCorrect(s.e3.stormReport)) list.push(`Das Labor hat falsche Sturmsektoren gemeldet (${s.e3.stormReport.join(', ')}, richtig: ${E3_STORM_SECTORS.join(', ')}).`)
       break
     case 'e4':
       if (s.comms.net !== 'backup' || s.e4.checkedIn.length < s.teams.length) list.push('Nicht alle Teams sind am Notkanal: −5 Minuten Zeitpuffer.')
@@ -283,8 +296,16 @@ export function upgradeGame(state: GameState): GameState {
   const old = Object.entries(state.e1.answers as Record<string, unknown>).filter(([, a]) => typeof (a as { by?: unknown }).by === 'string')
   // Der Film „servers“ ist im Sturmfilm aufgegangen.
   const oldFilm = (state.cutscene?.scene as string | undefined) === 'servers'
-  if (!old.length && !oldFilm) return state
+  // Früher gab es statt der Meldung des Labors nur „Sturm bekannt“.
+  const oldE3 = !('stormReport' in state.e3)
+  if (!old.length && !oldFilm && !oldE3) return state
   const s = structuredClone(state)
+  if (oldE3) {
+    const known = (s.e3 as unknown as { stormKnown?: boolean }).stormKnown
+    s.e3.stormReport = known ? [...E3_STORM_SECTORS] : null
+    s.e3.lastHit = null
+    delete (s.e3 as unknown as { stormKnown?: boolean }).stormKnown
+  }
   if (oldFilm && s.cutscene) s.cutscene.scene = 'storm'
   for (const [q, a] of old) {
     const { text, by } = a as { text: string; by: string }
@@ -453,6 +474,8 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
         if (s.comms.emojiOnly && !isEmojiOnly(text)) throw new RuleError('Ionensturm: Es sind nur Emojis erlaubt.')
       }
       s.chat.push({ id: s.nextMsgId++, ts: now, from: actor, to: action.to, text, net: s.comms.net === 'backup' ? 'backup' : 'primary' })
+      // Im Ionensturm informiert das Kommunikationsdeck die Crew über den Funk an alle.
+      if (s.phase === 'e3' && action.to === ALL && s.roleOwner.S5 === actor) crewInformed(s, now)
       if (!gm && s.comms.silence && !s.pausedAt) interruptRestart(s, now, teamName(s, actor))
       break
     }
@@ -463,10 +486,7 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
       if (!text) throw new RuleError('Die Meldung ist leer.')
       if (s.phase === 'e3') {
         if (!isEmojiOnly(text)) throw new RuleError('Ionensturm: Auch die Crew-Meldung darf nur aus Emojis bestehen.')
-        if (!s.e3.emojiStatement) {
-          s.e3.emojiStatement = true
-          hit(s, now, 'morale', 5, 'Kommunikationsdeck informiert die Crew trotz Ionensturm.')
-        }
+        crewInformed(s, now)
       } else {
         s.e6.statements += 1
         if (s.e6.statements === 1) hit(s, now, 'morale', 5, 'Kommunikationsdeck stellt die Falschmeldungen richtig.')
@@ -549,31 +569,45 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
       needPhase(s, 'e3')
       if (s.e3.arrived) throw new RuleError('Das Schiff hat das Feld bereits durchquert.')
       if (Math.abs(action.dx) + Math.abs(action.dy) !== 1) throw new RuleError('Ungültiger Kursbefehl.')
-      if (s.e3.energy < 1) throw new RuleError('Keine Energie. Versorgung muss Schub freigeben.')
-      const x = s.e3.pos.x + action.dx
-      const y = s.e3.pos.y + action.dy
-      const cell = E3_MAP[y]?.[x]
-      if (cell === undefined) throw new RuleError('Dieser Kurs führt aus dem Sektor hinaus.')
-      s.e3.energy -= 1
-      s.e3.energyUsed += 1
-      s.e3.trail.push({ ...s.e3.pos })
-      s.e3.pos = { x, y }
-      if (cell === '#') {
-        s.e3.collisions += 1
-        hit(s, now, 'hull', -5, 'Kollision mit einem Asteroiden!')
+      // Ein Klick verbraucht den ganzen Schub: So viele Felder, wie Versorgung Energie geladen hat.
+      const steps = s.e3.energy
+      if (steps < 1) throw new RuleError('Kein Schub geladen. Versorgung muss Energie liefern.')
+      for (let i = 1; i <= steps; i++) {
+        if (E3_MAP[s.e3.pos.y + action.dy * i]?.[s.e3.pos.x + action.dx * i] === undefined) throw new RuleError(`Mit ${steps} Feldern Schub führt dieser Kurs aus dem Sektor hinaus.`)
       }
-      if (cell === '~') s.e3.stormHits += 1
-      if (cell === 'G') {
-        s.e3.arrived = true
-        log(s, now, 'ARES 1 hat das Asteroidenfeld durchquert.', 'good')
+      for (let i = 0; i < steps && !s.e3.arrived; i++) {
+        const x = s.e3.pos.x + action.dx
+        const y = s.e3.pos.y + action.dy
+        const cell = E3_MAP[y][x]
+        s.e3.trail.push({ ...s.e3.pos })
+        s.e3.pos = { x, y }
+        if (cell === '#') {
+          s.e3.collisions += 1
+          s.e3.lastHit = { at: now, kind: 'rock' }
+          hit(s, now, 'hull', -5, 'Meteorit getroffen! Die ARES 1 ist beschädigt.')
+        }
+        if (E3_STORM_SECTORS.includes(cell)) {
+          // Im Sturm fallen die Triebwerke aus: Das Schiff bleibt stehen, der restliche Schub ist verloren.
+          s.e3.stormHits += 1
+          s.e3.lastHit = { at: now, kind: 'storm' }
+          hit(s, now, 'morale', -3, `Ionensturm in Sektor ${cell}! Die Triebwerke setzen aus, der restliche Schub ist verloren.`)
+          break
+        }
+        if (cell === 'G') {
+          s.e3.arrived = true
+          log(s, now, 'ARES 1 hat das Asteroidenfeld durchquert.', 'good')
+        }
       }
+      // Auch der Rest eines Schubs, der über das Ziel hinausreicht, ist verbraucht.
+      s.e3.energyUsed += steps
+      s.e3.energy = 0
       break
     }
     case 'e3Energy': {
       need(s, actor, 'S4')
       needPhase(s, 'e3')
       const released = s.e3.energy + s.e3.energyUsed
-      if (action.amount < 1 || action.amount > 5) throw new RuleError('Es können 1 bis 5 Einheiten freigegeben werden.')
+      if (![1, 3, 5].includes(action.amount)) throw new RuleError('Es können 1, 3 oder 5 Einheiten geliefert werden.')
       if (released + action.amount > E3_MAX_ENERGY) throw new RuleError('Die Energiereserve reicht dafür nicht mehr.')
       s.e3.energy += action.amount
       break
@@ -590,11 +624,12 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
     case 'e3Sectors': {
       need(s, actor, 'S2')
       needPhase(s, 'e3')
+      const sectors = [...new Set(action.sectors)].filter((x) => (E3_SECTOR_IDS as readonly string[]).includes(x)).sort()
+      if (!sectors.length) throw new RuleError('Wählt mindestens einen Sektor aus.')
       s.e3.sectorTries += 1
-      const same = action.sectors.length === E3_STORM_SECTORS.length && E3_STORM_SECTORS.every((x) => action.sectors.includes(x))
-      if (!same) throw new RuleError('Die Analyse passt nicht zu den Sensordaten. Prüft die Mittelwerte.')
-      s.e3.stormKnown = true
-      log(s, now, 'Labor hat die Sturmzonen bestimmt. Die Brücke sieht sie jetzt auf der Karte.', 'good')
+      s.e3.stormReport = sectors
+      // Ob die Meldung stimmt, sieht nur die Spielleitung. Die Brücke sieht die gemeldeten Sektoren so oder so.
+      log(s, now, `Labor meldet Sturm in ${sectorList(sectors)}. Die Brücke sieht die Sektoren auf der Karte.`, 'info')
       break
     }
     case 'e4Activate':

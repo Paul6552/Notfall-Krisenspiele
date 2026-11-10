@@ -2,7 +2,7 @@
 import type { Cutscene, CutsceneScene, GameState, Phase } from '../types'
 
 const SECONDS: Record<CutsceneScene, number> = {
-  intro: 9, prep: 10, control: 16, launch: 24, impact: 21, repair: 11, storm: 24, asteroids: 12, dish: 14, signal: 10, overload: 20, reactor: 11, restart: 11, bridge: 18, landing: 22, failure: 9, credits: 24,
+  intro: 9, prep: 10, control: 16, launch: 24, impact: 21, repair: 11, storm: 26, asteroids: 12, dish: 14, signal: 10, overload: 20, reactor: 11, restart: 11, bridge: 18, landing: 22, failure: 9, credits: 24,
 }
 
 type Script = Pick<Cutscene, 'scene' | 'title' | 'subtitle' | 'tone' | 'kw'>
@@ -11,10 +11,9 @@ function script(from: Phase, s: GameState, kw: number): Script | null {
   if (from === 'lessons') return null
   if (s.failure) return { scene: 'failure', title: 'Mission in Gefahr', subtitle: s.failure, tone: 'bad' }
   switch (from) {
-    case 'lobby':
-      return { scene: 'intro', title: 'Mission Red Planet', subtitle: 'Flug zum Mars', tone: 'good' }
+    // Der Titelfilm läuft erst nach dem Check-in. Beim Start in den Check-in sind oft noch nicht alle eingeloggt.
     case 'checkin':
-      return { scene: 'prep', title: 'Startvorbereitung läuft', subtitle: 'Die ARES 1 wird betankt. Alle Sektionen an ihre Plätze!', tone: 'good' }
+      return INTRO
     case 'e1':
       // Verspätet ist der Start nur, wenn die Brücke das Startfenster per NO-GO verschoben hat.
       return s.e1.noGos
@@ -46,9 +45,12 @@ function script(from: Phase, s: GameState, kw: number): Script | null {
   }
 }
 
+const INTRO: Script = { scene: 'intro', title: 'Mission Red Planet', subtitle: 'Flug zum Mars', tone: 'good' }
+
 const CREDITS: Script = { scene: 'credits', title: 'Mission Red Planet', subtitle: 'Danke an alle Sektionen!', tone: 'good' }
 
 const FOLLOW_UPS: Partial<Record<CutsceneScene, Script>> = {
+  intro: { scene: 'prep', title: 'Startvorbereitung läuft', subtitle: 'Die ARES 1 wird betankt. Alle Sektionen an ihre Plätze!', tone: 'good' },
   prep: { scene: 'control', title: 'GO oder NO-GO?', subtitle: 'Leiter der Brücke: Meldet das Ergebnis der letzten Überprüfung an die Flugkontrolle.', tone: 'warn' },
   launch: { scene: 'impact', title: 'WIR SIND GETROFFEN – HÜLLENSCHADEN', subtitle: 'Wir brauchen umgehend Reparatur!', tone: 'bad' },
   signal: { scene: 'overload', title: 'Atomreaktor kurz vor der Explosion!', subtitle: 'Stromverbrauch muss sofort reduziert werden', tone: 'bad' },

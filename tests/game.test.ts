@@ -6,7 +6,7 @@ import { shiftText } from '../src/game/cipher'
 import { isEmojiOnly } from '../src/game/emoji'
 import { CM_PER_UNIT, FRAME_H, FRAME_W, piecePolygon, polygonArea, shieldCoverage } from '../src/game/geometry'
 import { project } from '../src/game/projection'
-import { advanceWarnings, canStart, createGame, joinTeam, makeGameCode, pauseAfterHostReturn, reduce, setHostTeam, tick, totalKw, upgradeGame } from '../src/game/reducer'
+import { advanceWarnings, canStart, stormReportCorrect, createGame, joinTeam, makeGameCode, pauseAfterHostReturn, reduce, setHostTeam, tick, totalKw, upgradeGame } from '../src/game/reducer'
 import { ALL, GM, RuleError, ROLE_IDS } from '../src/game/types'
 import type { Action, GameState, PieceKind, Placement } from '../src/game/types'
 import { solveShield } from './solveShield'
@@ -50,39 +50,110 @@ describe('Rechenwerte aus der Excel', () => {
 })
 
 describe('Trümmerfeld', () => {
-  const path = () => {
+  const start = () => {
     const y0 = E3_MAP.findIndex((r) => r.includes('S'))
-    const start = [E3_MAP[y0].indexOf('S'), y0]
-    const seen = new Map<string, number[][]>([[start.join(), []]])
-    const queue = [start]
+    return [E3_MAP[y0].indexOf('S'), y0]
+  }
+  /** Kürzester Weg, der die Felder in `avoid` meidet. */
+  const path = (avoid: string[] = ['#', ...E3_STORM_SECTORS]) => {
+    const s0 = start()
+    const seen = new Map<string, number[][]>([[s0.join(), []]])
+    const queue = [s0]
     while (queue.length) {
       const [x, y] = queue.shift()!
       const cur = seen.get(`${x},${y}`)!
       if (E3_MAP[y][x] === 'G') return cur
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const c = E3_MAP[y + dy]?.[x + dx]
-        if (!c || c === '#' || c === '~' || seen.has(`${x + dx},${y + dy}`)) continue
+        if (!c || avoid.includes(c) || seen.has(`${x + dx},${y + dy}`)) continue
         seen.set(`${x + dx},${y + dy}`, [...cur, [dx, dy]])
         queue.push([x + dx, y + dy])
       }
     }
     return null
   }
+  /** Fasst gleiche Richtungen zu Schüben zusammen: [dx, dy, Felder]. */
+  const bursts = (moves: number[][]) => {
+    const out: number[][] = []
+    for (const [dx, dy] of moves) {
+      const last = out[out.length - 1]
+      if (last && last[0] === dx && last[1] === dy) last[2]++
+      else out.push([dx, dy, 1])
+    }
+    return out
+  }
+  const charge = (s: GameState, n: number) => {
+    for (const amount of [5, 3, 1]) {
+      while (n >= amount) {
+        s = reduce(s, { type: 'e3Energy', amount }, owner(s, 'S4'), 5)
+        n -= amount
+      }
+    }
+    return s
+  }
   it('hat einen sicheren Weg innerhalb der Energiereserve', () => {
     const p = path()
     expect(p).not.toBeNull()
     expect(p!.length).toBeLessThanOrEqual(E3_MAX_ENERGY)
-    expect(p!.length).toBeGreaterThan(16) // Der kürzeste Weg führt durch den Sturm und ist 16 Felder lang.
+    expect(p!.length).toBeGreaterThan(path(['#'])!.length) // Der kürzeste Weg führt durch den Sturm.
     expect(E3_MAP.every((r) => r.length === E3_MAP[0].length)).toBe(true)
   })
-  it('lässt sich mit Energie von Versorgung abfliegen, ohne Treffer', () => {
+  it('wer alle Sektoren meidet, kommt nicht durch', () => {
+    expect(path(['#', 'A', 'B', 'C', 'D', 'E', 'F'])).toBeNull()
+  })
+  it('lässt sich mit Schüben von Versorgung abfliegen, ohne Treffer', () => {
     let s = toPhase(setup(6), 'e3')
-    for (const [dx, dy] of path()!) {
-      if (s.e3.energy === 0) s = reduce(s, { type: 'e3Energy', amount: 5 }, owner(s, 'S4'), 5)
+    for (const [dx, dy, n] of bursts(path()!)) {
+      s = charge(s, n)
+      expect(s.e3.energy).toBe(n)
       s = reduce(s, { type: 'e3Move', dx, dy }, owner(s, 'S3'), 5)
+      expect(s.e3.energy).toBe(0)
     }
     expect(s.e3.arrived).toBe(true)
     expect(s.e3.collisions).toBe(0)
+    expect(s.e3.stormHits).toBe(0)
+  })
+  it('ein Klick fliegt so viele Felder, wie Schub geladen ist', () => {
+    let s = toPhase(setup(6), 'e3')
+    s = reduce(s, { type: 'e3Energy', amount: 1 }, owner(s, 'S4'), 5)
+    s = reduce(s, { type: 'e3Energy', amount: 1 }, owner(s, 'S4'), 5)
+    const from = s.e3.pos
+    s = reduce(s, { type: 'e3Move', dx: 0, dy: -1 }, owner(s, 'S3'), 5)
+    expect(s.e3.pos).toEqual({ x: from.x, y: from.y - 2 })
+    expect(s.e3.energyUsed).toBe(2)
+  })
+  it('lehnt Schübe ab, die aus dem Feld führen, ohne Energie zu verbrauchen', () => {
+    let s = toPhase(setup(6), 'e3')
+    s = reduce(s, { type: 'e3Energy', amount: 5 }, owner(s, 'S4'), 5)
+    expect(() => reduce(s, { type: 'e3Move', dx: -1, dy: 0 }, owner(s, 'S3'), 5)).toThrow(/hinaus/)
+    expect(s.e3.energy).toBe(5)
+  })
+  it('Asteroid: Treffer und Alarm für alle', () => {
+    let s = toPhase(setup(6), 'e3')
+    // Von S (0,3) zwei nach oben auf (0,1), dann rechts in den Asteroiden (1,1).
+    s = reduce(s, { type: 'e3Energy', amount: 1 }, owner(s, 'S4'), 5)
+    s = reduce(s, { type: 'e3Energy', amount: 1 }, owner(s, 'S4'), 5)
+    s = reduce(s, { type: 'e3Move', dx: 0, dy: -1 }, owner(s, 'S3'), 5)
+    s = reduce(s, { type: 'e3Energy', amount: 1 }, owner(s, 'S4'), 5)
+    const hull = s.ship.hull
+    s = reduce(s, { type: 'e3Move', dx: 1, dy: 0 }, owner(s, 'S3'), 7000)
+    expect(s.e3.collisions).toBe(1)
+    expect(s.ship.hull).toBe(hull - 5)
+    expect(project(s, owner(s, 'S5')).e3.lastHit).toEqual({ at: 7000, kind: 'rock' })
+  })
+  it('Sturm: Das Schiff bleibt im ersten Sturmfeld stehen, Moral sinkt sofort', () => {
+    let s = toPhase(setup(6), 'e3')
+    // Mitten durch Sektor B: S (0,3) → (0,4) und dann nach rechts bis (6,4) im Sturm.
+    s = reduce(s, { type: 'e3Energy', amount: 1 }, owner(s, 'S4'), 5)
+    s = reduce(s, { type: 'e3Move', dx: 0, dy: 1 }, owner(s, 'S3'), 5)
+    for (const amount of [5, 5]) s = reduce(s, { type: 'e3Energy', amount }, owner(s, 'S4'), 5)
+    const morale = s.ship.morale
+    s = reduce(s, { type: 'e3Move', dx: 1, dy: 0 }, owner(s, 'S3'), 9000)
+    expect(s.e3.pos).toEqual({ x: 6, y: 4 })
+    expect(s.e3.stormHits).toBe(1)
+    expect(s.e3.energy).toBe(0)
+    expect(s.ship.morale).toBe(morale - 3)
+    expect(s.e3.lastHit).toEqual({ at: 9000, kind: 'storm' })
   })
   it('verlangt Energie für jede Bewegung', () => {
     const s = toPhase(setup(6), 'e3')
@@ -349,6 +420,10 @@ describe('Filme', () => {
         expect(s.cutscene).toBeNull() // Der Abspann lief schon nach der Landung
         break
       }
+      if (s.phase === 'checkin') {
+        expect(s.cutscene).toBeNull() // Der Titelfilm wartet, bis alle eingeloggt sind
+        continue
+      }
       seen.push(s.cutscene?.scene)
       expect(s.cutscene!.at).toBe(t * 1000)
       const id = s.cutscene!.id
@@ -366,6 +441,7 @@ describe('Filme', () => {
     expect(seen.at(-2)).toBe('failure') // Ohne Lande-Code scheitert die Landung, der Abspann folgt trotzdem
     expect(seen.indexOf('storm')).toBe(seen.indexOf('repair') + 1)
     expect(seen.indexOf('control')).toBe(seen.indexOf('prep') + 1)
+    expect(seen.indexOf('prep')).toBe(seen.indexOf('intro') + 1)
     expect(seen.indexOf('bridge')).toBe(seen.indexOf('restart') + 1)
     expect(seen.indexOf('overload')).toBe(seen.indexOf('signal') + 1)
     expect(seen.indexOf('dish')).toBe(seen.indexOf('asteroids') + 1)
@@ -380,16 +456,18 @@ describe('Filme', () => {
     expect(reduce(s, { type: 'advance' }, GM, 9).cutscene).toMatchObject({ scene: 'reactor', kw: 135 })
   })
   it('nach dem Film geht es erst weiter, wenn die Spielleitung freigibt', () => {
-    let s = reduce(setup(2, true), { type: 'advance' }, GM, 1000)
+    let s = reduce(setup(2, true), { type: 'advance' }, GM, 500)
+    expect(s.cutscene).toBeNull() // Beim Start in den Check-in läuft noch kein Film
+    s = reduce(s, { type: 'advance' }, GM, 1000)
     const team = s.teams[0].id
     expect(() => reduce(s, { type: 'chat', to: ALL, text: 'Hallo' }, team, 2000)).toThrow(RuleError)
     expect(() => reduce(s, { type: 'releaseCutscene' }, team, 2000)).toThrow(RuleError)
     expect(() => reduce(s, { type: 'advance' }, GM, 2000)).toThrow(RuleError)
 
-    s = reduce(s, { type: 'releaseCutscene' }, GM, 60_000)
-    expect(s.cutscene!.released).toBe(true)
+    while (!s.cutscene!.released) s = reduce(s, { type: 'releaseCutscene' }, GM, 60_000)
+    expect(s.cutscene).toMatchObject({ id: 3, scene: 'control', released: true })
     expect(s.phaseStartedAt).toBe(60_000) // Die Wartezeit zählt nicht zum Ereignis
-    expect(reduce(s, { type: 'advance' }, GM, 61_000).cutscene).toMatchObject({ id: 2, released: false })
+    expect(reduce(s, { type: 'advance' }, GM, 61_000).cutscene).toMatchObject({ id: 4, released: false })
   })
   it('nach dem Start folgt der Einschlag, erst dessen Freigabe öffnet Ereignis 2', () => {
     let s = toPhase(setup(3), 'e1')
@@ -443,6 +521,9 @@ describe('Filme', () => {
     let s = toPhase(setup(3), 'checkin')
     s = { ...s, settings: { ...s.settings, cutscenes: true } }
     s = reduce(s, { type: 'advance' }, GM, 1000)
+    // Erst der Titelfilm, damit ihn alle sehen, dann die Startvorbereitung.
+    expect(s.cutscene).toMatchObject({ scene: 'intro' })
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 5000)
     expect(s.cutscene).toMatchObject({ scene: 'prep' })
     s = reduce(s, { type: 'releaseCutscene' }, GM, 10_000)
     expect(s.phase).toBe('e1')
@@ -484,9 +565,9 @@ describe('Filme', () => {
     expect(upgradeGame(s).cutscene).toMatchObject({ scene: 'storm', id: 9 })
   })
   it('Freigabe in einer Pause lässt die Uhr des Ereignisses bei null beginnen', () => {
-    let s = reduce(setup(2, true), { type: 'advance' }, GM, 1000)
+    let s = reduce(toPhase(setup(2, true), 'checkin'), { type: 'advance' }, GM, 1000)
     s = reduce(s, { type: 'pause' }, GM, 2000)
-    s = reduce(s, { type: 'releaseCutscene' }, GM, 50_000)
+    while (!s.cutscene!.released) s = reduce(s, { type: 'releaseCutscene' }, GM, 50_000)
     s = reduce(s, { type: 'resume' }, GM, 70_000)
     expect(s.pausedAt).toBeNull()
     expect(70_000 - s.phaseStartedAt - s.pausedMs).toBe(0)
@@ -583,9 +664,41 @@ describe('Rollenfilter', () => {
   it('Karte nur für die Brücke, Sturm erst nach der Analyse', () => {
     let s = toPhase(setup(7), 'e3')
     expect(project(s, owner(s, 'S3')).docs.e3Map).toBeUndefined()
-    expect(project(s, owner(s, 'LS')).docs.e3Map!.join('')).not.toContain('~')
+    expect(project(s, owner(s, 'LS')).docs.e3Map!.join('')).not.toMatch(/[A-F]/)
     s = reduce(s, { type: 'e3Sectors', sectors: ['D', 'B'] }, owner(s, 'S2'), 5)
-    expect(project(s, owner(s, 'LS')).docs.e3Map!.join('')).toContain('~')
+    const map = project(s, owner(s, 'LS')).docs.e3Map!.join('')
+    expect(map).toContain('B')
+    expect(map).toContain('D')
+    expect(map).not.toMatch(/[ACEF]/)
+    expect(stormReportCorrect(s.e3.stormReport)).toBe(true)
+  })
+  it('Falsche Meldung des Labors: Die Brücke sieht die falschen Sektoren, die Spielleitung erkennt den Fehler', () => {
+    let s = toPhase(setup(7), 'e3')
+    s = reduce(s, { type: 'e3Sectors', sectors: ['B', 'E'] }, owner(s, 'S2'), 5)
+    const map = project(s, owner(s, 'LS')).docs.e3Map!.join('')
+    expect(map).toContain('E')
+    expect(map).not.toContain('D')
+    expect(stormReportCorrect(s.e3.stormReport)).toBe(false)
+    expect(advanceWarnings(s).some((w) => w.includes('falsche Sturmsektoren'))).toBe(true)
+    expect(project(s, GM).docs.e3Map!.join('')).toContain('D')
+    // Das Labor kann korrigieren.
+    s = reduce(s, { type: 'e3Sectors', sectors: ['B', 'D'] }, owner(s, 'S2'), 6)
+    expect(stormReportCorrect(s.e3.stormReport)).toBe(true)
+  })
+  it('Kommunikationsdeck informiert die Crew über den Funk an alle', () => {
+    let s = toPhase(setup(7), 'e3')
+    const morale = s.ship.morale
+    s = reduce(s, { type: 'chat', to: 'all', text: '🚀☄️👍' }, owner(s, 'S5'), 5)
+    expect(s.e3.emojiStatement).toBe(true)
+    expect(s.ship.morale).toBe(Math.min(100, morale + 5))
+  })
+  it('alte Spielstände ohne Labor-Meldung werden übernommen', () => {
+    const s = toPhase(setup(3), 'e3')
+    const { stormReport: _r, lastHit: _h, ...e3 } = s.e3
+    const old = { ...s, e3: { ...e3, stormKnown: true } } as unknown as GameState
+    const up = upgradeGame(old)
+    expect(up.e3.stormReport).toEqual(['B', 'D'])
+    expect(up.e3.lastHit).toBeNull()
   })
   it('Die Brücke sieht bei Geräten nur Name und kW, Teams nur ihre eigenen', () => {
     const s = toPhase(setup(7), 'e5')

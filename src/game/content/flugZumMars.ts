@@ -208,17 +208,22 @@ export const MODULES: { id: string; owner: RoleId; kind: PieceKind }[] = [
 export const planLines = () => MODULES.map((m) => `${m.id} ${PIECE_SPECS[m.kind].label.toUpperCase()} ${PIECE_SPECS[m.kind].dimsText}`)
 
 // --- Ereignis 3 ---------------------------------------------------------------
-/** S = Start, G = Ziel, # = Asteroid, ~ = Ionensturm (erst nach der Labor-Analyse sichtbar). */
+/**
+ * S = Start, G = Ziel, # = Asteroid, A bis F = Sektoren, die das Labor misst.
+ * Nur die Sektoren in E3_STORM_SECTORS liegen wirklich im Ionensturm. Die Brücke sieht die Sektoren,
+ * die das Labor gemeldet hat, ob richtig oder falsch.
+ */
 export const E3_MAP = [
-  '..#......#....',
-  '.##.####.#.##.',
-  '....#..~~.#...',
-  'S.#.#..~~.##.#',
-  '..#....~~....G',
-  '.###.##~~.#.#.',
-  '......#...#...',
-  '.##.#...#...#.',
+  '....#.......#.',
+  '.##.#.BB.##.#.',
+  'AAA...BB..#FF.',
+  'SAA##.BB.#.FF#',
+  'AA#...BB.....G',
+  '.#..#.BB.DD.#.',
+  '...#.....DD#E.',
+  'CC.#.##..DD.E.',
 ]
+export const E3_SECTOR_IDS = ['A', 'B', 'C', 'D', 'E', 'F'] as const
 export const E3_MAX_ENERGY = 40
 export const E3_SENSORS = [
   { sector: 'A', values: [31, 28, 35, 30] },
@@ -231,22 +236,29 @@ export const E3_SENSORS = [
 export const E3_STORM_SECTORS = ['B', 'D']
 export const E3_THRESHOLD = 70
 
+/** Abweichungen im Ist-Bild. Sie sind bewusst klein, die Bilder haben viele Einzelteile. */
 export const E3_DIFFS: Record<'mast' | 'panel', { id: string; x: number; y: number; r: number; label: string }[]> = {
   mast: [
-    { id: 'dish', x: 60, y: 52, r: 26, label: 'Parabolspiegel verdreht' },
-    { id: 'light', x: 150, y: 24, r: 18, label: 'Warnlicht aus' },
-    { id: 'strut', x: 118, y: 150, r: 24, label: 'Strebe fehlt' },
-    { id: 'cable', x: 195, y: 120, r: 24, label: 'Kabel gerissen' },
-    { id: 'antenna', x: 228, y: 45, r: 24, label: 'Antenne abgeknickt' },
-    { id: 'hatch', x: 150, y: 228, r: 24, label: 'Wartungsklappe offen' },
+    { id: 'dish', x: 62, y: 70, r: 20, label: 'Großer Parabolspiegel verdreht' },
+    { id: 'feed', x: 258, y: 66, r: 13, label: 'Empfangskopf der kleinen Schüssel fehlt' },
+    { id: 'light', x: 150, y: 30, r: 13, label: 'Warnlicht orange statt rot' },
+    { id: 'antenna', x: 205, y: 26, r: 14, label: 'Antenne gekürzt' },
+    { id: 'cable', x: 209, y: 142, r: 17, label: 'Kabel hängt anders durch' },
+    { id: 'brace', x: 150, y: 180, r: 16, label: 'Diagonalstrebe fehlt' },
+    { id: 'cell', x: 82, y: 172, r: 11, label: 'Solarzelle ausgefallen' },
+    { id: 'sign', x: 165, y: 229, r: 12, label: 'Kennung A7 statt A1' },
+    { id: 'bolt', x: 190, y: 250, r: 10, label: 'Bolzen fehlt' },
   ],
   panel: [
-    { id: 'led1', x: 50, y: 40, r: 18, label: 'Falsche Statusleuchte' },
-    { id: 'gauge', x: 150, y: 70, r: 28, label: 'Zeiger im roten Bereich' },
-    { id: 'switch', x: 245, y: 45, r: 20, label: 'Schalter umgelegt' },
-    { id: 'plug', x: 65, y: 170, r: 24, label: 'Stecker fehlt' },
-    { id: 'screw', x: 262, y: 228, r: 16, label: 'Schraube fehlt' },
-    { id: 'bar', x: 180, y: 180, r: 26, label: 'Balken zu niedrig' },
+    { id: 'led', x: 104, y: 40, r: 10, label: 'Statusleuchte gelb statt grün' },
+    { id: 'gauge', x: 150, y: 60, r: 18, label: 'Zeiger verstellt' },
+    { id: 'knob', x: 80, y: 150, r: 15, label: 'Drehknopf verstellt' },
+    { id: 'slider', x: 220, y: 145, r: 15, label: 'Schieberegler verschoben' },
+    { id: 'screen', x: 48, y: 210, r: 14, label: 'Anzeige 41.3 statt 47.3' },
+    { id: 'toggle', x: 262, y: 165, r: 12, label: 'Kippschalter umgelegt' },
+    { id: 'screw', x: 290, y: 250, r: 10, label: 'Schraube fehlt' },
+    { id: 'wire', x: 224, y: 206, r: 15, label: 'Kabel falsch gesteckt' },
+    { id: 'tag', x: 240, y: 117, r: 13, label: 'Kanal CH-3 statt CH-2' },
   ],
 }
 

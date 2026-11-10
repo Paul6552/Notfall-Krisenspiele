@@ -149,6 +149,18 @@
 @keyframes c-field { from { opacity: 0; transform: scale(.4); } 30% { opacity: 1; } to { opacity: 1; transform: scale(1.15); } }
 .c-field i { position: absolute; border-radius: 46% 54% 58% 42% / 52% 44% 56% 48%; background: radial-gradient(circle at 35% 30%, #a08f7f, #4c4239 72%); }
 
+/* Zoom auf die ARES 1, damit klar ist, wessen Server getroffen werden */
+.c-stormout { position: absolute; inset: 0; transform-origin: 46% 60vh; animation: c-zoomship 3.2s ease-in both; }
+@keyframes c-zoomship { 0% { transform: scale(1); } 100% { transform: scale(3.6); } }
+.c-shipring { position: absolute; left: 46%; top: 60vh; width: 30vh; height: 30vh; margin: -15vh 0 0 -15vh; border-radius: 50%; border: .5vh solid #ffd36b; box-shadow: 0 0 24px #ffd36b; z-index: 4; opacity: 0; animation: c-shipring 3.2s both; }
+@keyframes c-shipring { 0% { opacity: 0; transform: scale(1.6); } 20%, 75% { opacity: 1; transform: scale(1); } 100% { opacity: 0; } }
+.c-shiplabel { position: absolute; left: 50%; top: 14vh; transform: translateX(-50%); z-index: 7; padding: 10px 18px; border-radius: 10px; background: rgb(5 8 17 / .8); border: 2px solid #ffd36b; text-align: center; opacity: 0; animation: c-shiplabel 3.2s both; max-width: calc(100% - 32px); }
+.c-shiplabel strong { display: block; font-size: clamp(1.4rem, 4vw, 2.6rem); color: #ffd36b; letter-spacing: .06em; }
+.c-shiplabel span { font-size: clamp(.95rem, 2vw, 1.3rem); color: #e6edf4; }
+@keyframes c-shiplabel { 0% { opacity: 0; transform: translate(-50%, 10px); } 15%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+.c-roomsign { position: absolute; top: 16vh; left: 50%; transform: translateX(-50%); margin: 0; padding: 6px 14px; border-radius: 6px; background: #ffd36b; color: #1a1408; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; font-size: clamp(.8rem, 2vw, 1.15rem); white-space: nowrap; z-index: 2; }
+.cut.held .c-shiplabel, .cut.held .c-shipring { display: none; }
+
 /* Serverraum */
 .c-serverroom { z-index: 5; background: linear-gradient(#10161c, #1a222a); animation-duration: .5s; }
 .c-serverroom svg { top: 10vh; height: 83vh; }
@@ -357,6 +369,8 @@
   .c-flag.still { display: none; }
   .c-crowd { height: 22vh; }
   .c-stormship { left: 34%; height: 16vh; }
+  .c-stormout { transform-origin: 34% 60vh; }
+  .c-shipring { left: 34%; }
   .c-stormsun { left: -32vw; width: 74vw; height: 74vw; margin-top: -37vw; }
   .c-wave { left: 0; }
   .c-field { width: 42vw; }

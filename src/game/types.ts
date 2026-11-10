@@ -130,7 +130,10 @@ export interface GameState {
     collisions: number
     stormHits: number
     arrived: boolean
-    stormKnown: boolean
+    /** Sektoren, die das Labor zuletzt als Sturm gemeldet hat. null: noch keine Meldung. */
+    stormReport: string[] | null
+    /** Letzter Treffer durch Asteroid oder Sturm, für den Alarm bei allen. */
+    lastHit: { at: number; kind: 'rock' | 'storm' } | null
     sectorTries: number
     found: Record<'mast' | 'panel', string[]>
     emojiStatement: boolean

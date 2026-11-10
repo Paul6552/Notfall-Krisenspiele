@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { BrowserContext, Page } from '@playwright/test'
-import { E3_DIFFS, E3_MAP, E5_START_KW, DEVICES, LANDING_CODE, MODULES, PIECE_SPECS, ROLES, SECTOR_CODES, SECTOR_ORDER } from '../src/game/content/flugZumMars'
+import { E3_DIFFS, E3_MAP, E3_STORM_SECTORS, E5_START_KW, DEVICES, LANDING_CODE, MODULES, PIECE_SPECS, ROLES, SECTOR_CODES, SECTOR_ORDER } from '../src/game/content/flugZumMars'
 import { FRAME_H, FRAME_W } from '../src/game/geometry'
 import { AUTO_ORDER } from '../src/game/reducer'
 import type { RoleId } from '../src/game/types'
@@ -48,6 +48,7 @@ async function setup(context: BrowserContext, n: number, films = false) {
   return { host, teams, code, as, next }
 }
 
+/** Sicherer Weg als Schübe: [Knopf von Antrieb, Felder]. */
 function safePath() {
   const y0 = E3_MAP.findIndex((r) => r.includes('S'))
   const start: [number, number] = [E3_MAP[y0].indexOf('S'), y0]
@@ -57,10 +58,18 @@ function safePath() {
   while (queue.length) {
     const [x, y] = queue.shift()!
     const cur = seen.get(`${x},${y}`)!
-    if (E3_MAP[y][x] === 'G') return cur
+    if (E3_MAP[y][x] === 'G') {
+      const bursts: [string, number][] = []
+      for (const label of cur) {
+        const last = bursts[bursts.length - 1]
+        if (last && last[0] === label) last[1]++
+        else bursts.push([label, 1])
+      }
+      return bursts
+    }
     for (const [dx, dy, label] of dirs) {
       const c = E3_MAP[y + dy]?.[x + dx]
-      if (!c || c === '#' || c === '~' || seen.has(`${x + dx},${y + dy}`)) continue
+      if (!c || c === '#' || E3_STORM_SECTORS.includes(c) || seen.has(`${x + dx},${y + dy}`)) continue
       seen.set(`${x + dx},${y + dy}`, [...cur, label])
       queue.push([x + dx, y + dy])
     }
@@ -150,30 +159,45 @@ for (const n of [2, 6, 7]) {
     await expect(teams[0].getByTestId('phase-title')).toHaveText(/Ereignis 3/)
     await expect(host.locator('.room .dot.on')).toHaveCount(n, { timeout: 15_000 })
 
-    const path = safePath()
-    for (let i = 0; i < path.length; i++) {
-      if (i % 5 === 0) { p = await as('S4'); await p.getByRole('button', { name: '+5 Energie' }).click() }
-      p = await as('S3')
-      const left = path.length - i
-      await expect(p.getByTestId('energy')).not.toHaveText('0')
-      await p.getByRole('button', { name: path[i] }).click()
-      await expect(p.getByTestId('energy')).toHaveText(String((5 - ((i + 1) % 5)) % 5), { timeout: 5000 })
-      void left
-    }
-    await expect(p.getByText('durchquert')).toBeVisible()
+    // Labor meldet zuerst falsch, die Spielleitung sieht das, dann korrigiert das Labor.
     p = await as('S2')
     await p.getByLabel('Sektor B im Sturm').check()
-    await p.getByLabel('Sektor D im Sturm').check()
+    await p.getByLabel('Sektor E im Sturm').check()
     await p.getByRole('button', { name: 'Analyse melden' }).click()
-    await expect(p.getByText('Analyse abgeschlossen')).toBeVisible()
+    await expect(p.getByText('Gemeldet: B, E')).toBeVisible()
+    await expect(host.getByText(/Labor-Meldung: B, E – falsch/)).toBeVisible()
+    await p.getByLabel('Sektor E im Sturm').uncheck()
+    await p.getByLabel('Sektor D im Sturm').check()
+    await p.getByRole('button', { name: 'Meldung korrigieren' }).click()
+    await expect(host.getByText(/Labor-Meldung: B, D – richtig/)).toBeVisible()
+
+    // Versorgung lädt den Schub, Antrieb fliegt ihn mit einem Klick.
+    for (const [button, fields] of safePath()) {
+      p = await as('S4')
+      let left = fields
+      for (const amount of [5, 3, 1]) {
+        while (left >= amount) {
+          await p.getByRole('button', { name: `+${amount} Energie` }).click()
+          left -= amount
+          await expect(p.getByTestId('charge')).toHaveText(String(fields - left))
+        }
+      }
+      p = await as('S3')
+      await expect(p.getByTestId('energy')).toHaveText(String(fields))
+      await p.getByRole('button', { name: button }).click()
+      await expect(p.getByTestId('energy')).toHaveText('0')
+    }
+    await expect(p.getByText('durchquert')).toBeVisible()
     for (const [role, puzzle] of [['S1', 'mast'], ['S6', 'panel']] as const) {
       p = await as(role)
       for (const d of E3_DIFFS[puzzle]) await clickSvg(p, `spot-${puzzle}`, d.x / 300, d.y / 260)
       await expect(p.getByText('Fehlerprüfung abgeschlossen')).toBeVisible()
     }
+    // Kommunikationsdeck meldet sich über den Funk an alle.
     p = await as('S5')
-    await p.getByLabel('Crew-Meldung').fill('🚀☄️👍')
-    await p.getByRole('button', { name: 'Veröffentlichen' }).click()
+    await p.getByLabel('Empfänger').selectOption({ label: 'Alle' })
+    await p.getByLabel('Nachricht').fill('🚀☄️👍')
+    await p.getByRole('button', { name: 'Senden' }).click()
     await expect(p.getByText('Crew-Meldung ist draußen')).toBeVisible()
 
     // Ereignis 4
@@ -264,6 +288,9 @@ test('Filme laufen bei allen gleichzeitig und hängen vom Spielverlauf ab', asyn
     await host.getByRole('button', { name: /Weiter für alle/ }).click()
     for (const p of [host, ...teams]) await expect(p.getByTestId('cutscene')).toHaveCount(0)
   }
+  // Beim Start in den Check-in läuft noch kein Film, damit sich erst alle einloggen. Der Titelfilm folgt danach.
+  await expect(film).toHaveCount(0)
+  await advance(host)
   await expect(film).toContainText('Mission Red Planet')
   await expect(host.getByTestId('cutscene')).toBeVisible()
   await teams[1].getByRole('button', { name: 'Überspringen' }).click()
@@ -272,9 +299,8 @@ test('Filme laufen bei allen gleichzeitig und hängen vom Spielverlauf ab', asyn
   await expect(host.getByRole('button', { name: 'Überspringen' })).toBeVisible()
   await expect(teams[1].getByRole('button', { name: /Weiter für alle/ })).toHaveCount(0)
   await host.getByRole('button', { name: 'Überspringen' }).click()
-  await release()
-
-  await advance(host)
+  await host.getByRole('button', { name: /Weiter für alle/ }).click()
+  await expect(film).toContainText('Startvorbereitung')
   await host.getByRole('button', { name: 'Überspringen' }).click()
   await host.getByRole('button', { name: /Weiter für alle/ }).click()
   await expect(film).toContainText('GO oder NO-GO?')
@@ -358,6 +384,7 @@ test('Musik lässt sich beim Beitritt abwählen und im Film wieder einschalten',
   await expect(team.getByText('Willkommen an Bord')).toBeVisible()
   await page.getByRole('button', { name: 'Automatisch verteilen' }).click()
   await page.getByRole('button', { name: 'Übung starten' }).click()
+  await advance(page)
   await expect(team.getByRole('button', { name: 'Musik einschalten' })).toBeVisible()
   await team.getByRole('button', { name: 'Musik einschalten' }).click()
   await expect(team.getByRole('button', { name: 'Musik ausschalten' })).toBeVisible()

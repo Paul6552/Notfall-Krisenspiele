@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
-import { E3_DIFFS, E3_MAX_ENERGY, E3_THRESHOLD } from '../game/content/flugZumMars'
+import { E3_DIFFS, E3_MAP, E3_MAX_ENERGY, E3_STORM_SECTORS, E3_THRESHOLD } from '../game/content/flugZumMars'
+import { stormReportCorrect } from '../game/reducer'
+import { GM } from '../game/types'
 import { Notice } from '../screens/shared'
 import type { PanelProps } from './types'
 
-const W = 14
-const H = 8
+const W = E3_MAP[0].length
+const H = E3_MAP.length
 
 function Grid({ children }: { children: ReactNode }) {
   return <svg className="radar" viewBox={`0 0 ${W} ${H}`}>{children}</svg>
@@ -18,6 +20,8 @@ function Trail({ view }: { view: PanelProps['view'] }) {
   return <polyline points={line} fill="none" stroke="var(--accent)" strokeWidth={0.07} strokeDasharray="0.15 0.12" />
 }
 
+const list = (sectors: string[]) => sectors.join(', ')
+
 export function E3({ view, role, act }: PanelProps) {
   const arrived = view.e3.arrived && <Notice tone="good">Die ARES 1 hat das Asteroidenfeld durchquert.</Notice>
   switch (role) {
@@ -26,39 +30,69 @@ export function E3({ view, role, act }: PanelProps) {
     case 'S4': return <div className="stack">{arrived}<Energy view={view} role={role} act={act} /></div>
     case 'S2': return <Sensors view={view} role={role} act={act} />
     case 'S1': return <SpotDiff puzzle="mast" view={view} act={act} title="Funkmast" />
-    case 'S6': return <SpotDiff puzzle="panel" view={view} act={act} title="Schaltpult der Funkanlage" />
+    case 'S6': return <SpotDiff puzzle="panel" view={view} act={act} title="Schaltpult des Funkmasts" />
     default: return <Crew view={view} role={role} act={act} />
   }
 }
 
 function BridgeMap({ view }: { view: PanelProps['view'] }) {
   const map = view.docs.e3Map ?? []
+  const gm = view.me === GM
+  const report = view.e3.stormReport
+  // Die Spielleitung sieht die echten Sturmsektoren violett und alle anderen Sektoren als Umriss.
+  const stormy = (c: string) => (gm ? E3_STORM_SECTORS.includes(c) : true)
+  const labels = new Map<string, { x: number; y: number }>()
+  map.forEach((row, y) => [...row].forEach((c, x) => { if (/[A-F]/.test(c) && !labels.has(c)) labels.set(c, { x, y }) }))
   return (
     <>
-      <p>Nur ihr seht das Trümmerfeld. Übermittelt Antrieb die Kursbefehle per Emoji. Das Labor kann die Sturmzonen bestimmen, sie erscheinen dann violett.</p>
+      <p>Nur ihr seht das Trümmerfeld. Gebt Antrieb die Richtung und Versorgung die Zahl der Felder, beides nur per Emoji. Ein Klick von Antrieb fliegt so viele Felder, wie Versorgung Schub geladen hat. Die Sektoren, die das Labor als Sturm meldet, erscheinen violett.</p>
+      {gm && (
+        <Notice tone={!report ? 'info' : stormReportCorrect(report) ? 'good' : 'bad'}>
+          {!report
+            ? <>Das Labor hat noch nichts gemeldet. Richtig wären die Sektoren {list(E3_STORM_SECTORS)}.</>
+            : stormReportCorrect(report)
+              ? <>Das Labor hat <strong>richtig</strong> gemeldet: {list(report)}.</>
+              : <>Das Labor hat <strong>falsch</strong> gemeldet: {list(report)}. Richtig wären {list(E3_STORM_SECTORS)}. Die Brücke sieht die falschen Sektoren.</>}
+        </Notice>
+      )}
       <Grid>
         {map.flatMap((row, y) => [...row].map((c, x) => {
-          if (c === '#') return <text key={`${x}-${y}`} x={x + 0.5} y={y + 0.72} fontSize={0.66} textAnchor="middle">🪨</text>
-          if (c === '~') return <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="#8d5cf0" opacity={0.55} />
-          if (c === 'G') return <text key={`${x}-${y}`} x={x + 0.5} y={y + 0.72} fontSize={0.66} textAnchor="middle">🏁</text>
+          const key = `${x}-${y}`
+          if (c === '#') return <text key={key} x={x + 0.5} y={y + 0.72} fontSize={0.66} textAnchor="middle">🪨</text>
+          if (c === 'G') return <text key={key} x={x + 0.5} y={y + 0.72} fontSize={0.66} textAnchor="middle">🏁</text>
+          if (/[A-F]/.test(c)) {
+            return stormy(c)
+              ? <rect key={key} x={x} y={y} width={1} height={1} fill="#8d5cf0" opacity={0.55} />
+              : <rect key={key} x={x + 0.04} y={y + 0.04} width={0.92} height={0.92} fill="none" stroke="#8d5cf0" strokeWidth={0.04} strokeDasharray="0.12 0.1" />
+          }
           return null
         }))}
+        {[...labels].map(([c, p]) => (
+          <text key={c} x={p.x + 0.12} y={p.y + 0.36} fontSize={0.32} fill="#fff" fontWeight={700}>
+            {c}{gm && report?.includes(c) ? ' ✓' : ''}
+          </text>
+        ))}
         <Trail view={view} />
         <Ship {...view.e3.pos} />
       </Grid>
-      <p className="muted small">Treffer: {view.e3.collisions} · Sturmfelder: {view.e3.stormHits}{view.e3.stormKnown ? '' : ' · Sturmzonen noch unbekannt'}</p>
+      <p className="muted small">
+        Treffer: {view.e3.collisions} · Sturmfelder: {view.e3.stormHits}
+        {report ? ` · Labor meldet Sturm in: ${list(report)}` : ' · Noch keine Meldung vom Labor'}
+        {gm && ' · ✓ = vom Labor gemeldet'}
+      </p>
     </>
   )
 }
 
 function Pilot({ view, act }: PanelProps) {
   const move = (dx: number, dy: number) => act({ type: 'e3Move', dx, dy })
+  const charge = view.e3.energy
   return (
     <>
-      <p>Ihr fliegt blind. Führt die Kursbefehle der Brücke aus. Jede Bewegung kostet 1 Einheit Energie von Versorgung.</p>
+      <p>Ihr fliegt blind. Ein Klick zündet den ganzen Schub, den Versorgung geladen hat: Bei 3 Energie fliegt das Schiff 3 Felder in die gewählte Richtung. Achtet darauf, dass Richtung und Schub zusammenpassen.</p>
       <Grid><Trail view={view} /><Ship {...view.e3.pos} /></Grid>
       <div className="row between wrap">
-        <p>Verfügbare Energie: <strong data-testid="energy">{view.e3.energy}</strong></p>
+        <p>Geladener Schub: <strong data-testid="energy">{charge}</strong> {charge === 1 ? 'Feld' : 'Felder'}</p>
         <div className="dpad">
           <button className="btn" aria-label="Nach oben" onClick={() => move(0, -1)}>⬆️</button>
           <button className="btn" aria-label="Nach links" onClick={() => move(-1, 0)}>⬅️</button>
@@ -72,10 +106,11 @@ function Pilot({ view, act }: PanelProps) {
 
 function Energy({ view, act }: PanelProps) {
   const released = view.e3.energy + view.e3.energyUsed
+  const charge = view.e3.energy
   return (
     <>
-      <p>Antrieb zündet, ihr liefert die Energie. Stimmt den Schub mit Antrieb ab. Die Reserve ist begrenzt, ein Umweg kann sie aufbrauchen.</p>
-      <p>Freigegeben und noch nicht verbraucht: <strong>{view.e3.energy}</strong> · Reserve: <strong>{E3_MAX_ENERGY - released}</strong></p>
+      <p>Ihr bestimmt, wie weit das Schiff fliegt. Jede Einheit Energie bringt es ein Feld weit. Antrieb verbraucht beim nächsten Klick den ganzen geladenen Schub. Fragt die Brücke, wie viele Felder es diesmal sein sollen. Die Reserve ist begrenzt.</p>
+      <p>Geladen für den nächsten Schub: <strong data-testid="charge">{charge}</strong> {charge === 1 ? 'Feld' : 'Felder'} · Reserve: <strong>{E3_MAX_ENERGY - released}</strong></p>
       <div className="row">
         {[1, 3, 5].map((n) => <button key={n} className="btn" onClick={() => act({ type: 'e3Energy', amount: n })}>+{n} Energie</button>)}
       </div>
@@ -84,12 +119,13 @@ function Energy({ view, act }: PanelProps) {
 }
 
 function Sensors({ view, act }: PanelProps) {
-  const [picked, setPicked] = useState<string[]>([])
+  const report = view.e3.stormReport
+  const [picked, setPicked] = useState<string[]>(report ?? [])
   const rows = view.docs.e3Sensors ?? []
-  if (view.e3.stormKnown) return <Notice tone="good">Analyse abgeschlossen. Die Brücke sieht die Sturmzonen auf der Karte.</Notice>
   return (
     <div className="stack">
-      <p>Wertet die Sensordaten aus: Sektoren mit einem Mittelwert über {E3_THRESHOLD} liegen im Ionensturm. Meldet sie, dann sieht die Brücke die Sturmzonen auf der Karte.</p>
+      <p>Wertet die Sensordaten aus: Sektoren mit einem Mittelwert über {E3_THRESHOLD} liegen im Ionensturm. Meldet sie. Die Brücke sieht die gemeldeten Sektoren auf ihrer Karte und weicht ihnen aus. Meldet ihr falsch, fliegt sie in den Sturm.</p>
+      {report && <Notice tone="info">Gemeldet: {list(report)}. Die Brücke sieht diese Sektoren. Ihr könnt die Meldung korrigieren.</Notice>}
       <table className="data">
         <thead><tr><th>Sektor</th><th colSpan={4}>Messwerte</th><th>Im Sturm</th></tr></thead>
         <tbody>
@@ -102,45 +138,65 @@ function Sensors({ view, act }: PanelProps) {
           ))}
         </tbody>
       </table>
-      <button className="btn primary" disabled={!picked.length} onClick={() => act({ type: 'e3Sectors', sectors: picked })}>Analyse melden</button>
+      <button className="btn primary" disabled={!picked.length} onClick={() => act({ type: 'e3Sectors', sectors: picked })}>{report ? 'Meldung korrigieren' : 'Analyse melden'}</button>
     </div>
   )
 }
 
 function Crew({ view, act }: PanelProps) {
   const [text, setText] = useState('')
+  // Ohne Funk im Spiel (externe Tools) bleibt das Formular als Ersatz.
+  const external = view.settings.comm === 'external'
   return (
     <div className="stack">
       <p>Die Crew ist verunsichert. Informiert sie mit einer Meldung, die nur aus Emojis besteht.</p>
+      {!external && <Notice tone="info">Sendet eure Meldung über den <strong>Funk rechts an „Alle“</strong>. Im Ionensturm kommen nur Emojis durch.</Notice>}
       {view.e3.emojiStatement && <Notice tone="good">Eure Crew-Meldung ist draußen.</Notice>}
-      <form className="row" onSubmit={(e) => { e.preventDefault(); act({ type: 'statement', text }); setText('') }}>
-        <input aria-label="Crew-Meldung" placeholder="🚀 ☄️ 👍" value={text} onChange={(e) => setText(e.target.value)} />
-        <button className="btn">Veröffentlichen</button>
-      </form>
+      {external && (
+        <form className="row" onSubmit={(e) => { e.preventDefault(); act({ type: 'statement', text }); setText('') }}>
+          <input aria-label="Crew-Meldung" placeholder="🚀 ☄️ 👍" value={text} onChange={(e) => setText(e.target.value)} />
+          <button className="btn">Veröffentlichen</button>
+        </form>
+      )}
     </div>
   )
 }
 
+/** Nach einem Fehlklick bleibt das Bild kurz gesperrt. So hilft wildes Antippen nicht weiter. */
+const MISS_LOCK_MS = 4000
+
 function SpotDiff({ puzzle, view, act, title }: { puzzle: 'mast' | 'panel'; view: PanelProps['view']; act: PanelProps['act']; title: string }) {
   const diffs = E3_DIFFS[puzzle]
   const found = view.e3.found[puzzle]
+  const [lockedUntil, setLockedUntil] = useState(0)
+  const [, rerender] = useState(0)
+  const locked = lockedUntil > Date.now()
+  useEffect(() => {
+    if (!locked) return
+    const timer = setTimeout(() => rerender((n) => n + 1), lockedUntil - Date.now())
+    return () => clearTimeout(timer)
+  }, [locked, lockedUntil])
   const Scene = puzzle === 'mast' ? Mast : Panel
   const click = (e: MouseEvent<SVGSVGElement>) => {
+    if (lockedUntil > Date.now()) return
     const r = e.currentTarget.getBoundingClientRect()
     const x = ((e.clientX - r.left) / r.width) * 300
     const y = ((e.clientY - r.top) / r.height) * 260
-    const hit = diffs.find((d) => Math.hypot(d.x - x, d.y - y) <= d.r && !found.includes(d.id))
-    if (hit) act({ type: 'e3Found', puzzle, diff: hit.id })
+    const hit = diffs.find((d) => Math.hypot(d.x - x, d.y - y) <= d.r)
+    if (!hit) setLockedUntil(Date.now() + MISS_LOCK_MS)
+    else if (!found.includes(hit.id)) act({ type: 'e3Found', puzzle, diff: hit.id })
   }
   return (
     <div className="stack">
-      <p>{title}: Der Ionensturm hat Schäden verursacht. Vergleicht Soll und Ist und tippt im Ist-Bild jede Abweichung an.</p>
+      <p>{title}: Der Ionensturm hat den Funkmast der ARES 1 beschädigt. Vergleicht Soll und Ist und tippt im Ist-Bild jede Abweichung an. <strong>Ziel: Sind alle Schäden gefunden, kann der Funkmast wieder repariert werden.</strong></p>
+      <p className="muted small">Die Abweichungen sind klein. Ein Fehlklick sperrt das Bild für {MISS_LOCK_MS / 1000} Sekunden.</p>
       <p><strong>{found.length} von {diffs.length}</strong> gefunden</p>
-      {found.length === diffs.length && <Notice tone="good">Fehlerprüfung abgeschlossen.</Notice>}
+      {found.length === diffs.length && <Notice tone="good">Fehlerprüfung abgeschlossen. Der Funkmast kann repariert werden.</Notice>}
+      {locked && <Notice tone="warn">Dort ist keine Abweichung. Kurz warten …</Notice>}
       <div className="spot">
         <figure><svg viewBox="0 0 300 260"><Scene broken={false} /></svg><figcaption>Soll</figcaption></figure>
         <figure>
-          <svg viewBox="0 0 300 260" data-testid={`spot-${puzzle}`} onClick={click} className="clickable">
+          <svg viewBox="0 0 300 260" data-testid={`spot-${puzzle}`} onClick={click} className={locked ? 'clickable locked' : 'clickable'}>
             <Scene broken />
             {diffs.filter((d) => found.includes(d.id)).map((d) => <circle key={d.id} cx={d.x} cy={d.y} r={d.r} fill="none" stroke="#5be08a" strokeWidth={3} />)}
           </svg>
@@ -151,46 +207,127 @@ function SpotDiff({ puzzle, view, act, title }: { puzzle: 'mast' | 'panel'; view
   )
 }
 
+const STARS = [[20, 18], [44, 120], [96, 22], [118, 54], [236, 150], [276, 40], [284, 196], [30, 230], [214, 92], [106, 110], [262, 228], [12, 96]]
+
+/** Gitterturm: x der Beine auf Höhe y. */
+const legL = (y: number) => 150 - (35 * (y - 40)) / 195
+const legR = (y: number) => 150 + (35 * (y - 40)) / 195
+const LEVELS = [40, 80, 120, 160, 200, 235]
+
 function Mast({ broken }: { broken: boolean }) {
   return (
-    <g stroke="#c9d6e2" strokeWidth={4} fill="none">
+    <g stroke="#c9d6e2" strokeWidth={2.5} fill="none" strokeLinecap="round">
       <rect width={300} height={260} fill="#12263a" stroke="none" />
-      <path d="M150 30 L110 240 M150 30 L190 240" />
-      <path d="M128 130 H172 M120 180 H180 M136 80 H164" />
-      {!broken && <path d="M118 188 L172 130" />}
-      {broken ? <path d="M36 40 Q60 92 90 62" strokeWidth={6} /> : <path d="M36 66 Q60 22 84 66" strokeWidth={6} />}
-      <path d="M60 52 L140 90" />
-      <circle cx={150} cy={24} r={9} fill={broken ? '#3b4654' : '#ff5a4f'} stroke="none" />
-      {broken
-        ? <><path d="M170 100 Q190 110 192 122" stroke="#e0a43a" /><path d="M204 128 Q216 160 240 170" stroke="#e0a43a" /></>
-        : <path d="M170 100 Q210 130 240 170" stroke="#e0a43a" />}
-      {broken ? <path d="M228 80 L228 48 L252 28" /> : <path d="M228 80 L228 18" />}
-      <path d="M188 100 L228 80" />
-      <rect x={126} y={214} width={48} height={32} fill="#23384d" />
-      {broken ? <path d="M126 214 L100 196 L100 228 L126 246Z" fill="#23384d" /> : <path d="M134 230 H166" />}
+      {STARS.map(([x, y]) => <circle key={x + y} cx={x} cy={y} r={1.3} fill="#8fa3b8" stroke="none" />)}
+      {/* Turm */}
+      <path d={`M150 40 L${legL(235)} 235 M150 40 L${legR(235)} 235`} strokeWidth={3.5} />
+      {LEVELS.slice(1, -1).map((y) => <path key={y} d={`M${legL(y)} ${y} H${legR(y)}`} />)}
+      {LEVELS.slice(0, -1).map((y1, i) => {
+        const y2 = LEVELS[i + 1]
+        if (broken && y1 === 160) return <path key={y1} d={`M${legR(y1)} ${y1} L${legL(y2)} ${y2}`} strokeWidth={1.6} />
+        return <path key={y1} d={`M${legL(y1)} ${y1} L${legR(y2)} ${y2} M${legR(y1)} ${y1} L${legL(y2)} ${y2}`} strokeWidth={1.6} />
+      })}
+      {/* Großer Parabolspiegel links */}
+      <path d="M140 92 L84 74" />
+      <g transform={broken ? 'rotate(14 62 70)' : undefined}>
+        <path d="M44 50 Q72 70 44 92" strokeWidth={5} />
+        <path d="M48 71 H70 M70 71 L76 68" strokeWidth={1.8} />
+        <circle cx={76} cy={68} r={2.6} fill="#c9d6e2" stroke="none" />
+      </g>
+      {/* Kleine Schüssel rechts */}
+      <path d="M160 90 L246 72" />
+      <path d="M248 58 Q262 70 248 84" strokeWidth={4} />
+      <path d="M250 71 H258" strokeWidth={1.5} />
+      {!broken && <circle cx={260} cy={67} r={2.4} fill="#c9d6e2" stroke="none" />}
+      {/* Warnlicht und Antenne */}
+      <circle cx={150} cy={30} r={6} fill={broken ? '#ff9a3c' : '#ff5a4f'} stroke="none" />
+      <path d="M165 60 L205 52 M205 52 L205 52" />
+      <path d={broken ? 'M205 52 L205 32' : 'M205 52 L205 16'} strokeWidth={1.6} />
+      <circle cx={205} cy={broken ? 32 : 16} r={2.2} fill="#c9d6e2" stroke="none" />
+      {/* Kabel */}
+      <path d={broken ? 'M168 110 Q210 120 250 170' : 'M168 110 Q210 160 250 170'} stroke="#e0a43a" strokeWidth={2.2} />
+      <path d="M250 170 V200 H262" stroke="#e0a43a" strokeWidth={2.2} />
+      <rect x={256} y={194} width={18} height={14} fill="#23384d" strokeWidth={1.5} />
+      {/* Solarpaneel links */}
+      <path d={`M${legL(165)} 165 L92 165`} />
+      {[0, 1, 2, 3].flatMap((i) => [0, 1].map((j) => (
+        <rect key={`${i}-${j}`} x={30 + i * 15} y={150 + j * 15} width={14} height={14} strokeWidth={1}
+          fill={broken && i === 3 && j === 1 ? '#1b2633' : '#2f5f9e'} />
+      )))}
+      {/* Häuschen mit Kennung */}
+      <rect x={122} y={212} width={56} height={30} fill="#23384d" />
+      <rect x={128} y={218} width={10} height={18} strokeWidth={1.2} />
+      <text x={156} y={233} fontSize={11} fill="#c9d6e2" stroke="none" fontWeight={700}>{broken ? 'A7' : 'A1'}</text>
+      {/* Grundplatte mit Bolzen */}
+      <rect x={100} y={244} width={100} height={10} fill="#3a4b5c" strokeWidth={1.5} />
+      {[110, 130, 170, 190].map((x) => (broken && x === 190 ? null : <circle key={x} cx={x} cy={250} r={2.6} fill="#9aaab8" stroke="none" />))}
     </g>
   )
 }
 
+const LED_AMBER = new Set(['1-0', '2-2', '3-1'])
+
 function Panel({ broken }: { broken: boolean }) {
+  const needle = (deg: number, cx: number, cy: number, len: number) => {
+    const a = (deg * Math.PI) / 180
+    return `M${cx} ${cy} L${cx + Math.cos(a) * len} ${cy + Math.sin(a) * len}`
+  }
   return (
     <g stroke="#0b1622" strokeWidth={2}>
       <rect width={300} height={260} fill="#2b4258" stroke="none" />
-      {[50, 86, 122].map((x, i) => <circle key={x} cx={x - 14 + 14} cy={40} r={10} fill={i === 0 && broken ? '#ff5a4f' : '#5be08a'} />)}
-      <circle cx={150} cy={80} r={0} />
-      <path d="M112 100 A40 40 0 0 1 188 100" fill="none" stroke="#c9d6e2" strokeWidth={8} />
-      <path d="M172 62 A40 40 0 0 1 188 100" fill="none" stroke="#ff5a4f" strokeWidth={8} />
-      <path d={broken ? 'M150 100 L180 76' : 'M150 100 L130 70'} stroke="#fff" strokeWidth={4} />
-      <rect x={232} y={24} width={26} height={44} rx={4} fill="#14222f" />
-      <rect x={236} y={broken ? 46 : 28} width={18} height={18} rx={3} fill="#e0a43a" />
-      <rect x={30} y={150} width={70} height={50} fill="#14222f" />
-      {!broken && <rect x={48} y={160} width={34} height={30} fill="#e0a43a" />}
-      {[130, 160, 190, 220].map((x, i) => {
-        const h = i === 1 && broken ? 16 : [40, 60, 50, 30][i]
-        return <rect key={x} x={x} y={210 - h} width={20} height={h} fill="#8fa8e8" />
+      {/* Statusleuchten */}
+      {Array.from({ length: 6 }, (_, i) => [0, 1, 2].map((j) => {
+        const amber = LED_AMBER.has(`${i}-${j}`) || (broken && i === 5 && j === 1)
+        return <circle key={`${i}-${j}`} cx={24 + i * 16} cy={24 + j * 16} r={4.5} fill={amber ? '#f2c14e' : '#5be08a'} strokeWidth={1} />
+      }))}
+      {/* Großes Messinstrument */}
+      <circle cx={160} cy={80} r={44} fill="#14222f" />
+      <path d="M124 80 A36 36 0 0 1 196 80" fill="none" stroke="#c9d6e2" strokeWidth={6} />
+      <path d="M185 54 A36 36 0 0 1 196 80" fill="none" stroke="#ff5a4f" strokeWidth={6} />
+      <path d={needle(broken ? -104 : -124, 160, 80, 32)} stroke="#fff" strokeWidth={3} />
+      <circle cx={160} cy={80} r={4} fill="#c9d6e2" />
+      {/* Kleines Messinstrument */}
+      <circle cx={240} cy={78} r={24} fill="#14222f" />
+      <path d={needle(-60, 240, 78, 18)} stroke="#fff" strokeWidth={2} />
+      <text x={240} y={121} fontSize={10} fill="#c9d6e2" stroke="none" textAnchor="middle" fontWeight={700}>{broken ? 'CH-3' : 'CH-2'}</text>
+      {/* Drehknöpfe */}
+      {[40, 80, 120].map((x, i) => {
+        const deg = [-60, 20, -150][i] + (broken && i === 1 ? 50 : 0)
+        return (
+          <g key={x}>
+            <circle cx={x} cy={150} r={13} fill="#1d2c3a" />
+            <path d={needle(deg, x, 150, 11)} stroke="#e0a43a" strokeWidth={3} />
+          </g>
+        )
       })}
-      {[[20, 20], [280, 20], [20, 240]].map(([x, y]) => <circle key={x + y} cx={x} cy={y} r={5} fill="#9aaab8" />)}
-      {!broken && <circle cx={262} cy={228} r={5} fill="#9aaab8" />}
+      {/* Schieberegler */}
+      {[170, 195, 220, 245].map((x, i) => {
+        const y = [140, 170, 155, 180][i] - (broken && i === 2 ? 22 : 0)
+        return (
+          <g key={x}>
+            <path d={`M${x} 125 V195`} stroke="#14222f" strokeWidth={4} />
+            <rect x={x - 8} y={y - 4} width={16} height={8} rx={2} fill="#8fa8e8" strokeWidth={1} />
+          </g>
+        )
+      })}
+      {/* Kippschalter */}
+      {[140, 165, 190].map((y, i) => {
+        const up = [true, false, true][i] !== (broken && i === 1)
+        return (
+          <g key={y}>
+            <rect x={255} y={y - 10} width={14} height={20} rx={3} fill="#14222f" strokeWidth={1} />
+            <rect x={258} y={up ? y - 8 : y} width={8} height={8} rx={2} fill="#e0a43a" stroke="none" />
+          </g>
+        )
+      })}
+      {/* Anzeige */}
+      <rect x={24} y={190} width={110} height={40} rx={4} fill="#0a1a12" />
+      <text x={34} y={216} fontSize={16} fill="#5be08a" stroke="none" fontFamily="monospace">{broken ? '41.3' : '47.3'} kPa</text>
+      {/* Kabel */}
+      <path d="M150 260 C150 236 176 222 186 200" fill="none" stroke="#ff5a4f" strokeWidth={4} />
+      <path d={broken ? 'M176 260 C176 238 220 222 236 202' : 'M176 260 C176 238 200 222 211 202'} fill="none" stroke="#4fb3a5" strokeWidth={4} />
+      {/* Schrauben */}
+      {[[10, 10], [290, 10], [10, 250], [290, 250]].map(([x, y]) => (broken && x === 290 && y === 250 ? null : <circle key={x * 1000 + y} cx={x} cy={y} r={5} fill="#9aaab8" strokeWidth={1} />))}
     </g>
   )
 }

@@ -1,6 +1,6 @@
 /** Musik und Klänge der Filme. Alles entsteht im Browser, es gibt keine Audiodateien. */
 import type { Cutscene } from '../game/types'
-import { CHORD, TENSION_CHORDS, THEME_A, THEME_A_CHORDS, THEME_B, THEME_B_CHORDS, createKit, note } from './music'
+import { ACTION_CHORDS, CHORD, THEME_A, THEME_A_CHORDS, THEME_B, THEME_B_CHORDS, createKit } from './music'
 import type { Kit, Progression } from './music'
 
 /** Treffer der Mikrometeoriten in Sekunden, passend zum Bild. */
@@ -9,9 +9,10 @@ export const IMPACT_HITS = [12.6, 13.4, 14.1, 14.8, 15.3]
 /** Einschlag in die Satellitenschüssel in Sekunden, passend zum Bild. */
 export const DISH_HIT = 8.4
 
-/** Ionensturm: Schnitt in den Serverraum und Stromstoß, passend zum Bild. */
-export const STORM_INSIDE = 10.5
-export const STORM_SURGE = 12.6
+/** Ionensturm: Zoom auf die ARES 1, Schnitt in den Serverraum und Stromstoß, passend zum Bild. */
+export const STORM_ZOOM = 8.6
+export const STORM_INSIDE = 11.8
+export const STORM_SURGE = 13.8
 
 /** Aufsetzen auf dem Mars in Sekunden, passend zum Bild. */
 export const TOUCHDOWN = 8.6
@@ -24,69 +25,77 @@ const IGNITION = 11.6
 
 type Film = Pick<Cutscene, 'scene' | 'tone'>
 
-/** Tiefster Akkordton als Paukenton, nie tiefer als D. */
-const drum = (chord: number[]) => (chord[0] < -31 ? chord[0] + 12 : chord[0])
-
+/**
+ * Die Musik ist durchgehend hell: C-Dur, Flächen, Arpeggien, Glockenspiel und ein leichter Rhythmus.
+ * Gefahr klingt nach Abenteuer und Tempo, nicht nach Dunkelheit.
+ */
 function helpers(k: Kit, film: Film) {
-  /** Streicher über eine Akkordfolge, wahlweise mit treibender Figur. Gibt die Länge zurück. */
-  const prog = (list: Progression, t: number, beat: number, vol = 0.04, figure = 0) => {
+  /** Akkordfolge als Fläche, wahlweise mit Arpeggio. Gibt die Länge zurück. */
+  const prog = (list: Progression, t: number, beat: number, vol = 0.028, arp = 0) => {
     let x = t
     for (const [c, beats] of list) {
-      k.chord(c, x, beats * beat + 0.25, vol)
-      if (figure) k.ostinato(c, x, beats, beat, figure)
+      k.chord(c, x, beats * beat + 0.2, vol)
+      if (arp) k.arp(c, x, beats, beat, arp)
       x += beats * beat
     }
     return x - t
   }
 
-  /** Spannung: pochender Bass in Moll unter dunklen Streichern. */
-  const tension = (t: number, until: number, bpm = 120, vol = 0.035) => {
+  /** Aufregung mit Zuversicht: schnelle Achtel, pumpender Bass, Rhythmus. Läuft bis `until`. */
+  const action = (t: number, until: number, bpm = 132, level = 1) => {
     const beat = 60 / bpm
     for (let x = t, i = 0; x < until - 0.1; x += beat * 4, i++) {
-      const c = TENSION_CHORDS[i % 4]
-      k.chord(c, x, Math.min(beat * 4, until - x) + 0.2, vol, false)
-      for (let b = 0; b < 8 && x + (b * beat) / 2 < until; b++) k.bass(c[0] + 12, x + (b * beat) / 2, beat * 0.42, vol * 2.4)
+      const c = ACTION_CHORDS[i % 4]
+      const len = Math.min(beat * 4, until - x)
+      k.chord(c, x, len + 0.15, 0.022 * level, false)
+      for (let b = 0; b < 8 && x + (b * beat) / 2 < until; b++) {
+        k.bass(c[0] + (b % 2 ? 12 : 0), x + (b * beat) / 2, beat * 0.4, 0.07 * level)
+        k.pluck(c[1 + (b % 4)] + 12, x + (b * beat) / 2, 0.03 * level, beat * 0.45)
+      }
+      k.groove(x, Math.min(4, Math.floor(len / beat + 0.01)), beat, 0.8 * level)
     }
   }
 
   /** Das Thema in voller Besetzung. */
-  const theme = (part: 'A' | 'B', t: number, beat: number, level = 1, figure = 0.04) => {
+  const theme = (part: 'A' | 'B', t: number, beat: number, level = 1, arp = 0.035, drums = true) => {
     const [melody, chords] = part === 'A' ? [THEME_A, THEME_A_CHORDS] : [THEME_B, THEME_B_CHORDS]
-    prog(chords, t, beat, 0.045 * level, figure * level)
-    k.line((n, x, d) => k.brass(n, x, d, 0.085 * level), melody, t, beat)
-    k.line((n, x, d) => k.strings(n + 12, x, d, 0.028 * level), melody, t, beat)
-    let x = t
-    for (const [c, beats] of chords) {
-      k.timpani(x, 0.28 * level, drum(c))
-      x += beats * beat
-    }
-    return x - t
+    const length = prog(chords, t, beat, 0.026 * level, arp * level)
+    k.line((n, x, d) => k.lead(n, x, d, 0.055 * level), melody, t, beat)
+    k.line((n, x, d) => k.bell(n + 12, x, 0.018 * level, Math.max(0.8, d)), melody, t, beat)
+    if (drums) k.groove(t, Math.round(length / beat), beat, 0.9 * level)
+    return length
   }
 
-  /** Akzent zum Titel: Auflösung, offene Frage oder Bedrohung. */
+  /** Akzent zum Titel. Auch schlechte Nachrichten enden mit einem Klang, der nach „Wir schaffen das“ klingt. */
   const sting = (t: number) => {
     if (film.tone === 'good') {
-      k.chord(CHORD.D, t, 3.4, 0.05)
-      ;[-7, -3, 0].forEach((n, i) => k.brass(n, t + i * 0.14, 0.2, 0.07))
-      k.brass(5, t + 0.42, 1.8, 0.08)
-      ;[5, 9, 12, 17].forEach((n, i) => k.bell(n, t + 0.42 + i * 0.16, 0.035))
-      k.timpani(t, 0.28)
-      k.cymbal(t + 0.42, 0.05)
+      k.chord(CHORD.C, t, 3.2, 0.035)
+      ;[3, 7, 10].forEach((n, i) => k.lead(n, t + i * 0.12, 0.16, 0.05))
+      k.lead(15, t + 0.36, 1.8, 0.055)
+      ;[15, 19, 22, 27].forEach((n, i) => k.bell(n, t + 0.36 + i * 0.14, 0.03))
+      k.timpani(t, 0.2)
+      k.cymbal(t + 0.36, 0.04)
     } else if (film.tone === 'warn') {
-      k.chord(CHORD.Bm, t, 3.2, 0.045)
-      ;[-10, -7, -3].forEach((n, i) => k.pluck(n + 12, t + i * 0.2, 0.07, 0.8))
-      k.timpani(t, 0.18, -22)
+      // Offene Frage: Fadd9 nach Gsus, ohne Auflösung, aber freundlich.
+      k.chord(CHORD.Fadd9, t, 1.6, 0.032)
+      k.chord(CHORD.Gsus, t + 1.5, 2.2, 0.032)
+      ;[0, 3, 7, 10].forEach((n, i) => k.marimba(n + 12, t + i * 0.18, 0.05))
+      k.bell(15, t + 1.5, 0.03, 2)
     } else {
-      k.chord(CHORD.Dm, t, 3.8, 0.055)
-      k.brass(-19, t, 2.2, 0.07)
-      k.brass(-12, t, 2.2, 0.05)
-      k.timpani(t, 0.34)
-      k.timpani(t + 0.35, 0.24)
-      k.noise(t, 1.6, { kind: 'brown', freq: 300, to: 70, vol: 0.3, release: 1.2 })
+      // Weckruf: zwei kräftige Schläge auf B-Dur, dann C-Dur. Klingt nach Aufbruch, nicht nach Untergang.
+      for (const [i, c] of [CHORD.Bb, CHORD.Bb, CHORD.C].entries()) {
+        const x = t + [0, 0.22, 0.6][i]
+        const d = i < 2 ? 0.16 : 2.6
+        for (const n of c.slice(2)) k.lead(n, x, d, 0.035)
+        k.bass(c[0], x, d, 0.12)
+        k.timpani(x, 0.24, c[0] + 12)
+      }
+      k.cymbal(t + 0.6, 0.05, 2)
+      k.chord(CHORD.C, t + 0.6, 2.8, 0.025, false)
     }
   }
 
-  return { prog, tension, theme, sting }
+  return { prog, action, theme, sting }
 }
 
 /**
@@ -103,7 +112,7 @@ export function scheduleFilm(
   reduced = false,
 ): AudioScheduledSourceNode[] {
   const k = createKit(ac, out, base, from)
-  const { prog, tension, theme, sting } = helpers(k, film)
+  const { prog, action, theme, sting } = helpers(k, film)
 
   if (reduced) {
     sting(0)
@@ -112,201 +121,193 @@ export function scheduleFilm(
 
   switch (film.scene) {
     case 'intro': {
-      // Paukenwirbel steigert sich bis zum Titel, dann das Thema als Fanfare.
-      ;[0, 0.6, 1.1, 1.5, 1.8, 2.05, 2.25, 2.38].forEach((t, i) => k.timpani(t, 0.08 + i * 0.03))
-      k.strings(-31, 0, 2.7, 0.05)
-      k.strings(-19, 0, 2.7, 0.04)
-      k.riser(1.2, 1.3, 0.04)
-      k.cymbal(2.5, 0.06)
-      theme('A', 2.5, 0.4, 1, 0)
+      // Glitzernder Anlauf bis zum Titel, dann das Thema.
+      ;[3, 7, 10, 15, 19, 22, 27].forEach((n, i) => k.bell(n, 0.3 + i * 0.3, 0.03))
+      k.chord(CHORD.Cadd9, 0, 2.6, 0.022)
+      k.riser(1, 1.5, 0.03)
+      k.cymbal(2.5, 0.04)
+      theme('A', 2.5, 0.42, 1, 0.03)
       break
     }
     case 'prep': {
-      // Aufbruch: treibende Figur, Marschtrommel und das Thema in den Bläsern.
-      const beat = 60 / 126
-      k.chord(CHORD.D, 0, 4 * beat + 0.25, 0.03)
-      k.ostinato(CHORD.D, 0, 4, beat, 0.05)
-      k.cymbal(4 * beat, 0.035)
-      theme('A', 4 * beat, beat, 0.9, 0.05)
-      for (let bar = 0; bar < 5; bar++) for (const b of [0, 1, 1.5, 2, 3, 3.5]) k.snare((bar * 4 + b) * beat, 0.022 + bar * 0.006)
-      k.noise(1, 7, { filter: 'bandpass', freq: 900, vol: 0.012, attack: 1, release: 2 })
+      // Aufbruchstimmung: Arpeggio, dann das Thema mit Rhythmus.
+      const beat = 60 / 120
+      k.chord(CHORD.C, 0, 4 * beat + 0.2, 0.022)
+      k.arp(CHORD.C, 0, 4, beat, 0.035)
+      k.cymbal(4 * beat, 0.03)
+      theme('A', 4 * beat, beat, 0.9, 0.035)
       break
     }
     case 'control': {
-      // Erwartungsvoll: ruhige Figur, vor jeder Durchsage ein Funkton.
-      prog([[CHORD.D, 4], [CHORD.G, 4], [CHORD.Bm, 4], [CHORD.A, 4], [CHORD.D, 4], [CHORD.G, 4], [CHORD.A, 3]], 0, 0.6, 0.035, 0.03)
+      // Erwartungsvoll und freundlich: Marimba-Puls, vor jeder Durchsage ein Funkton.
+      const beat = 0.6
+      prog([[CHORD.C, 4], [CHORD.F, 4], [CHORD.Am, 4], [CHORD.G, 4], [CHORD.C, 4], [CHORD.F, 4], [CHORD.Gsus, 3]], 0, beat, 0.022)
+      for (let b = 0; b < 27; b++) k.marimba([3, 7, 10, 7][b % 4] + (b % 8 < 4 ? 0 : 2), b * beat, 0.03)
       for (const t of [1.1, 5.9]) {
-        k.tone(660, t, 0.1, { vol: 0.05 })
-        k.noise(t + 0.1, 0.35, { filter: 'bandpass', freq: 700, vol: 0.02, release: 0.3 })
+        k.tone(880, t, 0.08, { vol: 0.035 })
+        k.tone(1175, t + 0.1, 0.08, { vol: 0.03 })
       }
       break
     }
     case 'launch': {
-      // Countdown über einer anschwellenden Dominante, dann die Triebwerke und das Thema.
-      k.strings(-24, 0, 6.2, 0.03)
-      k.strings(-12, 0, 6.2, 0.03)
-      k.chord(CHORD.A, 5.6, IGNITION - 5.4, 0.05)
+      // Countdown über einer wachsenden Dominante, Zündung, dann das Thema in voller Pracht.
+      k.chord(CHORD.Gsus, 0, IGNITION, 0.02)
       COUNTDOWN.forEach((_, i) => {
         const t = countdownAt(i)
-        k.tone(660, t, 0.12, { vol: 0.045 })
-        k.timpani(t, 0.08 + i * 0.03, -24)
+        k.tone(880, t, 0.1, { vol: 0.035 })
+        k.marimba(-2 + i, t, 0.035)
+        k.kick(t, 0.06 + i * 0.02)
       })
-      k.riser(8.6, 3, 0.06)
-      // Zündung: tiefes Grollen, Prasseln und ein Bass, den man eher spürt als hört.
-      k.cymbal(IGNITION, 0.07, 2.5)
-      k.thump(IGNITION, 0.5)
-      k.noise(IGNITION, 10, { kind: 'brown', freq: 90, to: 420, vol: 0.5, attack: 0.6, release: 7 })
-      k.noise(IGNITION, 6, { filter: 'bandpass', freq: 500, to: 1200, q: 0.6, vol: 0.05, attack: 0.4, release: 4.5 })
-      k.crackle(IGNITION + 0.2, 7, { vol: 0.12, freq: 1500, attack: 0.3, release: 5 })
-      k.tone(38, IGNITION, 8, { to: 55, vol: 0.22, attack: 0.5, release: 5 })
+      k.riser(8.6, 3, 0.04)
+      // Zündung: kräftig, aber kurz. Das Triebwerk rauscht hell statt zu grollen.
+      k.cymbal(IGNITION, 0.06, 2.4)
+      k.thump(IGNITION, 0.4)
+      k.noise(IGNITION, 7, { kind: 'brown', freq: 200, to: 600, vol: 0.22, attack: 0.4, release: 5 })
+      k.noise(IGNITION, 6, { filter: 'bandpass', freq: 900, to: 2000, q: 0.6, vol: 0.04, attack: 0.3, release: 4.5 })
+      k.crackle(IGNITION + 0.2, 5, { vol: 0.06, freq: 2000, attack: 0.3, release: 4 })
       // Der Schlusston des Themas fällt auf den Titel.
       const beat = 60 / 132
       theme('B', stingAt - 12 * beat, beat)
-      k.cymbal(stingAt, 0.07)
-      k.chord(CHORD.D, stingAt, 24 - stingAt, 0.045)
-      k.brass(5, stingAt, 3.4, 0.07)
-      ;[5, 9, 12, 17, 12, 9].forEach((n, i) => k.bell(n, stingAt + 0.3 + i * 0.3, 0.035))
+      k.cymbal(stingAt, 0.05)
+      k.chord(CHORD.C, stingAt, 24 - stingAt, 0.03)
+      ;[15, 19, 22, 27, 22, 19].forEach((n, i) => k.bell(n, stingAt + 0.3 + i * 0.3, 0.028))
       break
     }
     case 'impact': {
-      k.chord(CHORD.D, 0, 1.4, 0.03)
-      k.siren(1, 8.2)
-      tension(5.2, 16, 120)
-      for (let i = 0; i < 16; i++) k.whoosh(8.3 + i * 0.36, 0.8, 0.08)
+      k.chord(CHORD.C, 0, 1.4, 0.022)
+      k.siren(1, 6)
+      action(4.6, stingAt, 138)
+      for (let i = 0; i < 16; i++) k.whoosh(8.3 + i * 0.36, 0.8, 0.06)
       for (const t of IMPACT_HITS) {
-        k.thump(t)
-        k.timpani(t, 0.2)
+        k.thump(t, 0.4)
+        k.timpani(t, 0.14)
       }
-      k.noise(15.4, 3, { filter: 'bandpass', freq: 1000, vol: 0.03, attack: 0.3, release: 2 })
       sting(stingAt)
       break
     }
     case 'repair': {
       // Mit jedem Teil steigt die Tonleiter.
-      const scale = [-7, -5, -3, -2, 0, 2, 4, 5, 7, 9, 10, 12, 14, 17]
+      const scale = [-9, -7, -5, -4, -2, 0, 2, 3, 5, 7, 8, 10, 12, 15]
       scale.forEach((n, i) => {
-        k.noise(0.5 + i * 0.32, 0.1, { filter: 'bandpass', freq: 1400, vol: 0.05 })
-        k.pluck(n, 0.5 + i * 0.32, 0.06)
+        k.noise(0.5 + i * 0.32, 0.06, { filter: 'bandpass', freq: 2400, vol: 0.03 })
+        k.marimba(n + 12, 0.5 + i * 0.32, 0.045)
       })
-      k.chord(CHORD.G, 0, 3, 0.03)
-      k.chord(CHORD.A, 2.8, stingAt - 2.7, 0.035)
+      k.chord(CHORD.F, 0, 2.9, 0.022)
+      k.chord(CHORD.G, 2.8, stingAt - 2.7, 0.025)
+      k.groove(0.5, 10, 0.5, 0.6)
       sting(stingAt)
       break
     }
     case 'storm': {
-      k.chord(CHORD.D, 0, 3, 0.03)
-      // Der Ausbruch rollt heran, dann knistert es auf der Hülle.
-      k.noise(2.6, 7.6, { kind: 'brown', freq: 120, to: 500, vol: 0.4, attack: 2, release: 2.5 })
-      k.tone(42, 2.6, 7.6, { to: 60, vol: 0.14, attack: 2, release: 2.5 })
-      for (const t of [4.9, 5.9, 7]) k.thump(t, 0.45)
-      k.crackle(4.9, 4.6, { vol: 0.12, freq: 1800 })
-      tension(4.9, STORM_INSIDE, 126)
-      // Im Schiff: Die Server brummen, dann der Stromstoß und ein Rack nach dem anderen fällt aus.
-      k.tone(60, STORM_INSIDE, STORM_SURGE - STORM_INSIDE, { type: 'triangle', vol: 0.1, attack: 0.3, release: 0.05 })
-      k.tone(120, STORM_INSIDE, STORM_SURGE - STORM_INSIDE, { vol: 0.04, attack: 0.3, release: 0.05 })
-      k.thump(STORM_SURGE, 0.55)
-      k.noise(STORM_SURGE, 0.9, { freq: 900, to: 160, vol: 0.22, release: 0.7 })
-      ;[-9, -12, -16, -19, -24].forEach((n, i) => k.tone(note(n), STORM_SURGE + 0.4 + i * 0.45, 0.32, { type: 'triangle', vol: 0.1 }))
-      k.crackle(STORM_SURGE + 0.2, 5, { vol: 0.07, freq: 1200, release: 2 })
-      tension(STORM_SURGE, stingAt, 100, 0.03)
+      k.chord(CHORD.C, 0, 2.8, 0.022)
+      // Der Ausbruch rauscht heran, dann knistert es auf der Hülle. Die Musik zieht das Tempo an.
+      k.noise(2.6, 6.4, { filter: 'bandpass', freq: 500, to: 2600, q: 0.7, vol: 0.08, attack: 2, release: 2 })
+      for (const t of [4.9, 5.9, 7]) k.thump(t, 0.3)
+      k.crackle(4.9, 4, { vol: 0.07, freq: 2400 })
+      action(3, STORM_ZOOM, 132)
+      // Zoom auf die ARES 1: aufsteigendes Glockenspiel lenkt den Blick aufs Schiff.
+      k.riser(STORM_ZOOM, STORM_INSIDE - STORM_ZOOM, 0.04)
+      ;[3, 7, 10, 15, 19].forEach((n, i) => k.bell(n, STORM_ZOOM + 0.3 + i * 0.5, 0.032))
+      k.chord(CHORD.Gsus, STORM_ZOOM, STORM_INSIDE - STORM_ZOOM + 0.2, 0.024)
+      // Im Schiff: Die Server summen, dann der Stromstoß und ein Rack nach dem anderen fällt aus.
+      k.tone(240, STORM_INSIDE, STORM_SURGE - STORM_INSIDE, { type: 'triangle', vol: 0.03, attack: 0.3, release: 0.05 })
+      for (let t = STORM_INSIDE; t < STORM_SURGE; t += 0.25) k.tone(1320, t, 0.04, { vol: 0.012 })
+      k.thump(STORM_SURGE, 0.4)
+      k.noise(STORM_SURGE, 0.7, { freq: 2400, to: 400, vol: 0.12, release: 0.6 })
+      ;[15, 12, 8, 5, 3].forEach((n, i) => k.marimba(n, STORM_SURGE + 0.4 + i * 0.45, 0.05))
+      k.crackle(STORM_SURGE + 0.2, 3.5, { vol: 0.04, freq: 2200, release: 2 })
+      action(STORM_SURGE + 2.6, stingAt, 120, 0.8)
       sting(stingAt)
       break
     }
     case 'asteroids':
-      tension(0.2, stingAt, 132)
-      for (const t of [1.4, 3.2, 4.9, 6.3, 8.4]) k.whoosh(t, 1.1, 0.1)
+      action(0.2, stingAt, 138)
+      for (const t of [1.4, 3.2, 4.9, 6.3]) k.whoosh(t, 1, 0.07)
       sting(stingAt)
-      k.crackle(10.6, 1.3, { vol: 0.12, freq: 1300, rate: 60 })
       break
     case 'dish':
-      prog([[CHORD.D, 4], [CHORD.G, 4]], 0, 0.55, 0.03, 0.035)
-      k.noise(1, 3.4, { kind: 'brown', freq: 240, to: 500, vol: 0.1, attack: 1, release: 1 })
-      for (const t of [4.6, 5.5, 6.4, 7.3]) k.tone(784, t, 0.14, { vol: 0.04 })
-      k.chord(CHORD.Dm, 4.4, 4.2, 0.04)
-      k.whoosh(7.7, 0.75, 0.12)
-      k.thump(DISH_HIT, 0.55)
-      k.noise(DISH_HIT, 1.6, { freq: 900, to: 140, vol: 0.2, release: 1.3 })
-      k.crackle(9, 1, { vol: 0.06 })
+      prog([[CHORD.C, 4], [CHORD.F, 4]], 0, 0.55, 0.022, 0.03)
+      for (const t of [4.6, 5.5, 6.4, 7.3]) k.tone(988, t, 0.1, { vol: 0.03 })
+      k.chord(CHORD.Gsus, 4.4, 4.1, 0.025)
+      k.whoosh(7.7, 0.75, 0.09)
+      k.thump(DISH_HIT, 0.45)
+      k.noise(DISH_HIT, 1.2, { freq: 2000, to: 300, vol: 0.1, release: 1 })
+      action(DISH_HIT + 0.4, stingAt, 132, 0.8)
       sting(stingAt)
       break
     case 'signal':
-      ;[0, 0.14, 0.28, 0.6, 0.74, 1.05, 1.5, 1.64, 2].forEach((t) => k.tone(620, t + 0.2, 0.08, { vol: 0.045 }))
-      ;[5, 9, 12, 14, 17].forEach((n, i) => k.bell(n, 1.2 + i * 0.8, 0.055))
-      k.chord(CHORD.G, 0, 3, 0.03)
-      k.chord(CHORD.A, 2.8, stingAt - 2.7, 0.035)
+      ;[0, 0.14, 0.28, 0.6, 0.74, 1.05, 1.5, 1.64, 2].forEach((t) => k.tone(988, t + 0.2, 0.07, { vol: 0.03 }))
+      ;[3, 7, 10, 12, 15].forEach((n, i) => k.bell(n + 12, 1.2 + i * 0.7, 0.04))
+      k.chord(CHORD.F, 0, 2.9, 0.022)
+      k.chord(CHORD.G, 2.8, stingAt - 2.7, 0.025)
+      k.arp(CHORD.G, 2.8, Math.floor((stingAt - 2.8) / 0.5), 0.5, 0.03)
       sting(stingAt)
       break
     case 'overload': {
-      prog([[CHORD.D, 4], [CHORD.G, 4]], 0, 0.6, 0.03, 0.03)
-      // Die Last steigt: Das Brummen wird höher, die Warntöne kommen immer schneller.
-      k.tone(55, 5, 8.5, { type: 'triangle', to: 165, vol: 0.12, attack: 1, release: 0.2 })
-      k.tone(110, 5, 8.5, { to: 330, vol: 0.06, attack: 1, release: 0.2 })
-      k.noise(5, 8.5, { kind: 'brown', freq: 180, to: 700, vol: 0.2, attack: 3, release: 0.2 })
-      for (let t = 5.4, step = 1; t < 13.3; t += step, step = Math.max(0.24, step * 0.86)) k.tone(587, t, 0.08, { type: 'triangle', vol: 0.045 })
-      tension(8, stingAt, 132, 0.03)
-      k.thump(13.5, 0.55)
-      k.siren(13.5, 19, 0.04)
+      prog([[CHORD.C, 4], [CHORD.F, 4]], 0, 0.6, 0.022, 0.03)
+      // Die Last steigt: Ein Ton klettert, die Warntöne kommen immer schneller, die Musik zieht mit.
+      k.tone(220, 5, 8.5, { type: 'triangle', to: 660, vol: 0.04, attack: 1, release: 0.2 })
+      for (let t = 5.4, step = 1; t < 13.3; t += step, step = Math.max(0.24, step * 0.86)) k.tone(1175, t, 0.06, { vol: 0.03 })
+      action(8, stingAt, 144, 0.9)
+      k.thump(13.5, 0.4)
+      k.siren(13.5, 17)
       sting(stingAt)
       break
     }
     case 'reactor':
-      k.tone(160, 0, 5.8, { type: 'triangle', to: 55, vol: 0.08, attack: 0.5, release: 1 })
-      k.noise(0, 5.8, { kind: 'brown', freq: 500, to: 120, vol: 0.1, attack: 0.5, release: 1 })
-      k.chord(CHORD.A, 0, stingAt + 0.1, 0.035)
+      k.tone(330, 0, 5.8, { type: 'triangle', to: 165, vol: 0.03, attack: 0.5, release: 1 })
+      prog([[CHORD.F, 4], [CHORD.G, 4]], 0, stingAt / 8, 0.024, 0.03)
       sting(stingAt)
       break
     case 'restart':
-      k.tone(55, 0, 5.8, { type: 'triangle', to: 110, vol: 0.07, attack: 0.5, release: 1 })
-      prog([[CHORD.D, 4], [CHORD.G, 4], [CHORD.A, 2]], 0, stingAt / 10, 0.035, 0.03)
+      k.tone(165, 0, 5.8, { type: 'triangle', to: 330, vol: 0.03, attack: 0.5, release: 1 })
+      prog([[CHORD.C, 4], [CHORD.F, 4], [CHORD.G, 2]], 0, stingAt / 10, 0.025, 0.035)
+      k.groove(0, 10, stingAt / 10, 0.6)
       sting(stingAt)
       break
     case 'bridge':
-      prog([[CHORD.D, 4], [CHORD.G, 4]], 0, 0.575, 0.03)
-      k.chord(CHORD.Dm, 4.6, 4.9, 0.03, false)
-      k.chord(CHORD.Gm, 9.2, stingAt - 9.1, 0.035, false)
-      // Herzschlag, der immer schneller wird, dazu die Warnung der Anzeigen.
-      for (let t = 5, step = 1.1; t < 17; t += step, step = Math.max(0.55, step * 0.95)) {
-        k.timpani(t, 0.2)
-        k.timpani(t + 0.2, 0.12)
-      }
-      for (let t = 5.4; t < 12; t += 1.6) k.tone(587, t, 0.12, { type: 'triangle', vol: 0.04 })
+      prog([[CHORD.C, 4], [CHORD.F, 4]], 0, 0.575, 0.022)
+      // Herzklopfen der Crew als leiser Puls, dazu die Warnung der Anzeigen. Die Musik bleibt zuversichtlich.
+      for (let t = 4.6, step = 0.6; t < 12.4; t += step, step = Math.max(0.42, step * 0.97)) k.kick(t, 0.12)
+      for (let t = 5.4; t < 12; t += 1.6) k.tone(1175, t, 0.08, { vol: 0.025 })
+      action(4.6, stingAt, 126, 0.7)
       sting(stingAt)
       break
     case 'landing': {
-      // Bremsschub über einer Dominante, die sich beim Aufsetzen in die Feier auflöst.
-      k.noise(0, TOUCHDOWN, { kind: 'brown', freq: 600, to: 200, vol: 0.28, attack: 1, release: 0.25 })
-      k.crackle(0.5, TOUCHDOWN - 0.5, { vol: 0.06, freq: 1200, release: 0.3 })
-      k.tone(70, 0, TOUCHDOWN, { to: 42, vol: 0.12, attack: 1, release: 0.2 })
-      k.chord(CHORD.A, 0, TOUCHDOWN + 0.2, 0.035)
-      k.chord(CHORD.A, 4, TOUCHDOWN - 3.8, 0.03, false)
-      k.riser(TOUCHDOWN - 2.5, 2.5, 0.05)
-      k.thump(TOUCHDOWN, 0.6)
-      k.noise(TOUCHDOWN, 2.4, { kind: 'brown', freq: 700, to: 150, vol: 0.14, release: 1.8 })
-      // Feier: das Thema zweimal, beim zweiten Mal mit Glocken und Becken.
+      // Bremsschub über einer Spannung, die sich beim Aufsetzen in die Feier auflöst.
+      k.noise(0, TOUCHDOWN, { filter: 'bandpass', freq: 900, to: 400, q: 0.6, vol: 0.07, attack: 1, release: 0.25 })
+      k.crackle(0.5, TOUCHDOWN - 0.5, { vol: 0.03, freq: 2000, release: 0.3 })
+      k.chord(CHORD.Gsus, 0, 4.1, 0.024)
+      k.chord(CHORD.G, 4, TOUCHDOWN - 3.8, 0.026)
+      k.arp(CHORD.G, 4, Math.floor((TOUCHDOWN - 4) / 0.42), 0.42, 0.03)
+      k.riser(TOUCHDOWN - 2.5, 2.5, 0.04)
+      k.thump(TOUCHDOWN, 0.45)
+      // Feier: das Thema zweimal, beim zweiten Mal mit mehr Glanz.
       const beat = 0.39
       const pass = 16 * beat
       for (const [i, t] of [stingAt, stingAt + pass].entries()) {
-        k.cymbal(t, 0.08, 2.5)
-        theme('B', t, beat, 1.05, 0.05)
-        for (let bar = 0; bar < 4; bar++) for (const b of [1, 3, 3.5]) k.snare(t + (bar * 4 + b) * beat, 0.04)
-        if (i === 1) for (let b = 0; b < 16; b++) k.bell([17, 21, 24, 21][b % 4], t + b * beat, 0.03, 1)
+        k.cymbal(t, 0.06, 2.2)
+        theme('B', t, beat, 1.05, 0.04)
+        if (i === 1) for (let b = 0; b < 32; b++) k.bell([15, 19, 22, 27][b % 4] + 12, t + (b * beat) / 2, 0.016, 0.6)
       }
-      k.cymbal(stingAt + pass + 12 * beat, 0.09, 3)
+      k.cymbal(stingAt + pass + 12 * beat, 0.07, 2.6)
       break
     }
     case 'failure':
-      k.chord(CHORD.Dm, 0, stingAt + 0.3, 0.04)
-      for (let t = 0.4; t < stingAt; t += 0.7) k.tone(294, t, 0.3, { type: 'triangle', vol: 0.08 })
+      // Ernst, aber nicht trostlos: ruhige Fläche, dann der Weckruf.
+      k.chord(CHORD.Am, 0, 1.3, 0.024)
+      k.chord(CHORD.F, 1.2, stingAt - 1.1, 0.024)
+      for (let t = 0.4; t < stingAt; t += 0.6) k.marimba(3, t, 0.035)
       sting(stingAt)
       break
     case 'credits': {
-      // Ruhige Reprise des ganzen Themas mit Glocken.
-      const beat = 60 / 84
+      // Ruhige, warme Fassung des ganzen Themas mit Glockenspiel und Marimba.
+      const beat = 60 / 88
       for (const [i, part] of ([[THEME_A, THEME_A_CHORDS], [THEME_B, THEME_B_CHORDS]] as const).entries()) {
         const t = 0.6 + i * 16 * beat
-        prog(part[1], t, beat, 0.035, 0.03)
-        k.line((n, x, d) => k.bell(n + 12, x, 0.05, Math.max(1.4, d)), part[0], t, beat)
-        k.line((n, x, d) => k.strings(n, x, d, 0.02), part[0], t, beat)
+        prog(part[1], t, beat, 0.024, 0.026)
+        k.line((n, x, d) => k.bell(n + 12, x, 0.04, Math.max(1.2, d)), part[0], t, beat)
+        k.line((n, x, d) => k.marimba(n, x, 0.03, Math.max(0.5, d)), part[0], t, beat)
       }
       break
     }
@@ -315,34 +316,34 @@ export function scheduleFilm(
 }
 
 /** Länge eines Durchlaufs der Grundmusik in Sekunden. */
-export const AMBIENT_SECONDS = (60 / 66) * 16
+export const AMBIENT_SECONDS = (60 / 72) * 16
 
-/** Ein Durchlauf der leisen Grundmusik, die läuft, bis die Spielleitung freigibt. */
+/** Ein Durchlauf der leisen, hellen Grundmusik, die läuft, bis die Spielleitung freigibt. */
 export function scheduleAmbient(ac: BaseAudioContext, out: AudioNode, film: Film, base: number, index: number): AudioScheduledSourceNode[] {
   const k = createKit(ac, out, base)
   const bar = AMBIENT_SECONDS / 4
-  const chords = film.tone === 'good' ? [CHORD.D, CHORD.G, CHORD.Bm, CHORD.A] : film.tone === 'warn' ? [CHORD.Bm, CHORD.G, CHORD.Em, CHORD.A] : TENSION_CHORDS
+  const beat = bar / 4
+  const chords = film.tone === 'good' ? [CHORD.C, CHORD.F, CHORD.Am, CHORD.G] : film.tone === 'warn' ? [CHORD.F, CHORD.C, CHORD.G, CHORD.Am] : [CHORD.Am, CHORD.F, CHORD.C, CHORD.G]
   chords.forEach((c, i) => {
-    k.chord(c, i * bar, bar + 0.9, 0.017)
-    if (film.tone === 'bad') {
-      k.timpani(i * bar, 0.05)
-      k.timpani(i * bar + 0.3, 0.03)
-    }
+    k.chord(c, i * bar, bar + 0.6, 0.014)
+    // Leises Marimba-Arpeggio in Vierteln hält die Musik in Bewegung.
+    for (let b = 0; b < 4; b++) k.marimba(c[1 + ((b + index) % 4)] + 12, i * bar + b * beat, 0.018)
+    if (film.tone === 'bad') k.kick(i * bar, 0.05)
   })
-  if (film.tone !== 'bad') (index % 2 ? [0, 2, -2, 0] : [5, 9, 7, 4]).forEach((n, i) => k.bell(n + (film.tone === 'good' ? 12 : 0), i * bar + 0.02, 0.016, 2.4))
-  if (film.scene === 'landing') chords.forEach((c, i) => k.ostinato(c, i * bar, 4, bar / 4, 0.014))
+  ;(index % 2 ? [3, 7, 5, 2] : [10, 8, 12, 7]).forEach((n, i) => k.bell(n + 12, i * bar + beat * 2, 0.012, 2))
   return k.sources
 }
 
 type Bed = { kind: 'white' | 'brown'; filter: BiquadFilterType; freq: number; q: number; vol: number }
-const ENGINE: Bed = { kind: 'brown', filter: 'lowpass', freq: 220, q: 0.7, vol: 0.1 }
-const HUM: Bed = { kind: 'brown', filter: 'bandpass', freq: 110, q: 5, vol: 0.12 }
-const WIND: Bed = { kind: 'white', filter: 'bandpass', freq: 420, q: 0.6, vol: 0.018 }
-/** Dauergeräusch unter dem Wartebild: Triebwerk, Maschinenbrummen oder Wind. */
+// Das Dauergeräusch bleibt leise im Hintergrund, damit das Wartebild nicht bedrückend wirkt.
+const ENGINE: Bed = { kind: 'brown', filter: 'bandpass', freq: 380, q: 0.8, vol: 0.04 }
+const HUM: Bed = { kind: 'brown', filter: 'bandpass', freq: 240, q: 4, vol: 0.03 }
+const WIND: Bed = { kind: 'white', filter: 'bandpass', freq: 900, q: 0.6, vol: 0.01 }
+/** Dauergeräusch unter dem Wartebild: Triebwerk, Maschinensummen oder Wind. */
 const BEDS: Partial<Record<Cutscene['scene'], Bed>> = {
   intro: WIND, prep: WIND, landing: WIND, credits: WIND,
   launch: ENGINE, impact: ENGINE, repair: ENGINE, asteroids: ENGINE, dish: ENGINE, signal: ENGINE, restart: ENGINE,
-  storm: HUM, overload: HUM, reactor: HUM, bridge: { ...HUM, vol: 0.05 }, control: { ...HUM, vol: 0.04 },
+  storm: HUM, overload: HUM, reactor: HUM, bridge: { ...HUM, vol: 0.015 }, control: { ...HUM, vol: 0.015 },
 }
 
 // Die Stummschaltung gilt nur für dieses Gerät. Die Lautstärke regelt jede Person am Betriebssystem.
@@ -511,8 +512,8 @@ export function playSample(onEnd: () => void) {
   const cancel = whenRunning(() => {
     const k = createKit(ac, bus, ac.currentTime + 0.08)
     const seconds = helpers(k, { scene: 'intro', tone: 'good' }).theme('B', 0, SAMPLE_BEAT)
-    k.cymbal(0, 0.05)
-    k.chord(CHORD.D, seconds - 4 * SAMPLE_BEAT, 4 * SAMPLE_BEAT + 1.2, 0.04)
+    k.cymbal(0, 0.04)
+    k.chord(CHORD.C, seconds - 4 * SAMPLE_BEAT, 4 * SAMPLE_BEAT + 1.2, 0.03)
     sources = k.sources
   })
   const timer = setTimeout(onEnd, (16 * SAMPLE_BEAT + 1.4) * 1000)

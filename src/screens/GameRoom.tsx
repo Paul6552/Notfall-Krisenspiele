@@ -51,6 +51,25 @@ export function StatusBar({ view, offset = 0 }: { view: View; offset?: number })
   )
 }
 
+/** So lange bleibt der Alarm nach einem Asteroidentreffer stehen. */
+const HIT_ALERT_MS = 8000
+
+/** Rahmen mit Hinweis für alle, wenn die ARES 1 in Ereignis 3 einen Meteoriten trifft (rot) oder in den Sturm fliegt (violett). */
+export function HitAlert({ view, offset = 0 }: { view: View; offset?: number }) {
+  const now = useNow(offset)
+  const last = view.phase === 'e3' ? view.e3.lastHit : null
+  if (!last || now - last.at > HIT_ALERT_MS) return null
+  return (
+    <div className={`hit-alert ${last.kind}`} key={last.at}>
+      <div className="hit-alert-msg" role="alert">
+        {last.kind === 'rock'
+          ? '☄️ Meteorit getroffen! Die ARES 1 ist beschädigt (Hülle −5 %).'
+          : '⚡ Ionensturm! Die Triebwerke setzen aus, der restliche Schub ist verloren (Moral −3 %).'}
+      </div>
+    </div>
+  )
+}
+
 function RolePanel({ view, role, act }: { view: View; role: RoleId; act: (a: Action) => void }) {
   const props = { view, role, act }
   switch (view.phase) {
@@ -114,6 +133,7 @@ export function GameRoom({ view, act, error, clockOffset }: { view: View; act: (
   return (
     <div className="room-layout">
       <StatusBar view={view} offset={clockOffset} />
+      <HitAlert view={view} offset={clockOffset} />
       <aside className="ship-col">
         <ShipScene
           teams={view.teams}
