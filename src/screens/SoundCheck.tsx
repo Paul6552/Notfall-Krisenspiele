@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { getVolume, isMuted, playSample, setMuted, setVolume, subscribeSound } from '../ship/filmSound'
+import { isMuted, playSample, setMuted, subscribeSound } from '../ship/filmSound'
 
-/** Musik ein- und ausschalten, Lautstärke einstellen und vor dem Spiel probehören. Gilt nur für dieses Gerät. */
+/** Musik ein- und ausschalten und vor dem Spiel probehören. Die Lautstärke regelt das Betriebssystem. */
 export function SoundCheck() {
   const muted = useSyncExternalStore(subscribeSound, isMuted)
-  const volume = useSyncExternalStore(subscribeSound, getVolume)
   const [testing, setTesting] = useState(false)
   const stop = useRef<(() => void) | null>(null)
 
@@ -28,12 +27,9 @@ export function SoundCheck() {
     <div className="soundcheck">
       <label className="radio"><input type="checkbox" checked={!muted} onChange={(e) => { setMuted(!e.target.checked); if (!e.target.checked) end() }} /> Musik und Klänge in den Filmen</label>
       <div className="row wrap">
-        <label className="field grow">Lautstärke
-          <input type="range" min={0} max={1} step={0.05} value={volume} disabled={muted} onChange={(e) => setVolume(Number(e.target.value))} />
-        </label>
         <button type="button" className="btn small" disabled={muted} aria-pressed={testing} onClick={test}>{testing ? 'Test stoppen' : 'Musik testen'}</button>
       </div>
-      <p className="muted small">Gilt nur für dieses Gerät. Hört ihr beim Test nichts, prüft Lautsprecher und Lautstärke des Geräts.</p>
+      <p className="muted small">Gilt nur für dieses Gerät. Die Lautstärke stellt ihr am Gerät ein. Hört ihr beim Test nichts, prüft Lautsprecher und Lautstärke des Geräts.</p>
     </div>
   )
 }

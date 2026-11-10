@@ -345,10 +345,10 @@ const BEDS: Partial<Record<Cutscene['scene'], Bed>> = {
   storm: HUM, overload: HUM, reactor: HUM, bridge: { ...HUM, vol: 0.05 }, control: { ...HUM, vol: 0.04 },
 }
 
-// Stummschaltung und Lautstärke gelten nur für dieses Gerät.
+// Die Stummschaltung gilt nur für dieses Gerät. Die Lautstärke regelt jede Person am Betriebssystem.
 const MUTE_KEY = 'krisenuebung.stumm'
-const VOLUME_KEY = 'krisenuebung.lautstaerke'
-const DEFAULT_VOLUME = 0.7
+/** Fester Pegel, auf den die Filmmischung abgestimmt ist. */
+const LEVEL = 0.7
 
 function read<T>(key: string, parse: (raw: string | null) => T, fallback: T) {
   try {
@@ -368,14 +368,12 @@ function store(key: string, value: string) {
 
 const inBrowser = typeof window !== 'undefined'
 let muted = inBrowser ? read(MUTE_KEY, (raw) => raw === '1', false) : false
-let volume = inBrowser ? read(VOLUME_KEY, (raw) => (raw === null || Number.isNaN(Number(raw)) ? DEFAULT_VOLUME : Math.min(1, Math.max(0, Number(raw)))), DEFAULT_VOLUME) : DEFAULT_VOLUME
 const listeners = new Set<() => void>()
 let context: AudioContext | null = null
 let master: GainNode | null = null
 const waiting = new Set<() => void>()
 
 export const isMuted = () => muted
-export const getVolume = () => volume
 export const subscribeSound = (listener: () => void) => {
   listeners.add(listener)
   return () => { listeners.delete(listener) }
@@ -383,7 +381,7 @@ export const subscribeSound = (listener: () => void) => {
 export const subscribeMuted = subscribeSound
 
 function applyLevel() {
-  if (context && master) master.gain.setTargetAtTime(muted ? 0 : volume, context.currentTime, 0.02)
+  if (context && master) master.gain.setTargetAtTime(muted ? 0 : LEVEL, context.currentTime, 0.02)
   listeners.forEach((l) => l())
 }
 
@@ -393,17 +391,11 @@ export function setMuted(value: boolean) {
   applyLevel()
 }
 
-export function setVolume(value: number) {
-  volume = Math.min(1, Math.max(0, value))
-  store(VOLUME_KEY, String(volume))
-  applyLevel()
-}
-
 function audio() {
   if (!context && typeof AudioContext !== 'undefined') {
     context = new AudioContext()
     master = context.createGain()
-    master.gain.value = muted ? 0 : volume
+    master.gain.value = muted ? 0 : LEVEL
     master.connect(context.createDynamicsCompressor()).connect(context.destination)
     context.onstatechange = () => {
       if (context?.state !== 'running') return

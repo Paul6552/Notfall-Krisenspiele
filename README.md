@@ -36,7 +36,7 @@ Die Filme sind im Browser animiert und brauchen keine Videodateien. Manche Über
 
 Am Ende jedes Films läuft das Schlussbild weiter: Triebwerke brennen, Sterne ziehen vorbei, dazu spielt leise Grundmusik. Das bleibt so, bis die Spielleitung mit „Weiter für alle“ freigibt. Erst dann sehen alle das nächste Ereignis, und erst dann läuft dessen Uhr. Zwischen zwei Filmen bleibt das Bild dunkel, das Spiel ist dabei nicht zu sehen. Jede Person kann den Film für sich überspringen und landet dann ebenfalls beim Schlussbild. Die Spielleitung kann die Filme in der Lobby abschalten.
 
-Musik und Klänge entstehen im Browser, es gibt keine Audiodateien. Ein wiederkehrendes Thema verbindet die Filme. Vor dem Spiel prüft jede Person den Ton mit „Musik testen“: beim Beitritt, im Warteraum und in der Lobby der Spielleitung. Dort und in jedem Film lassen sich Musik und Lautstärke für das eigene Gerät einstellen, die Spielleitung kann das nicht für andere festlegen. Browser spielen Ton erst nach einem Klick auf der Seite: Wer während eines Films neu lädt, hört ihn erst nach dem nächsten Klick.
+Musik und Klänge entstehen im Browser, es gibt keine Audiodateien. Ein wiederkehrendes Thema verbindet die Filme. Vor dem Spiel prüft jede Person den Ton mit „Musik testen“: beim Beitritt, im Warteraum und in der Lobby der Spielleitung. Dort und in jedem Film lässt sich die Musik für das eigene Gerät ein- und ausschalten, die Spielleitung kann das nicht für andere festlegen. Die Lautstärke regelt jede Person am Betriebssystem. Browser spielen Ton erst nach einem Klick auf der Seite: Wer während eines Films neu lädt, hört ihn erst nach dem nächsten Klick.
 
 ### Konsole der Spielleitung
 

@@ -4,7 +4,7 @@ import { E5_LIMIT_KW, E5_START_KW, ROLES } from '../game/content/flugZumMars'
 import { SHIELD_TARGET } from '../game/geometry'
 import { ROLE_IDS } from '../game/types'
 import type { Cutscene, CutsceneScene, RoleId } from '../game/types'
-import { COUNTDOWN, COUNTDOWN_STEP, DISH_HIT, IMPACT_HITS, STORM_INSIDE, STORM_SURGE, TOUCHDOWN, countdownAt, getVolume, isMuted, playAmbient, playFilm, setMuted, setVolume, subscribeSound } from './filmSound'
+import { COUNTDOWN, COUNTDOWN_STEP, DISH_HIT, IMPACT_HITS, STORM_INSIDE, STORM_SURGE, TOUCHDOWN, countdownAt, isMuted, playAmbient, playFilm, setMuted, subscribeSound } from './filmSound'
 import './cutscene.css'
 
 /** `float` lässt das Schiff im All sanft treiben, auch im Wartebild. */
@@ -478,7 +478,6 @@ export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRele
   const [watched, setWatched] = useState(0)
   const skip = useRef<HTMLButtonElement>(null)
   const muted = useSyncExternalStore(subscribeSound, isMuted)
-  const volume = useSyncExternalStore(subscribeSound, getVolume)
   const id = cutscene?.id ?? 0
   const expired = cutscene ? Date.now() + offset - cutscene.at >= cutscene.seconds * 1000 : true
   const active = Boolean(cutscene) && !cutscene?.released
@@ -541,7 +540,6 @@ export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRele
         <button className="c-skip" aria-pressed={muted} onClick={() => setMuted(!muted)}>
           <span aria-hidden>{muted ? '🔇' : '🔊'}</span> Musik {muted ? 'einschalten' : 'ausschalten'}
         </button>
-        <input type="range" aria-label="Lautstärke" min={0} max={1} step={0.05} value={volume} disabled={muted} onChange={(e) => setVolume(Number(e.target.value))} />
       </div>
       {playing && <button ref={skip} className="c-skip c-skipfilm" onClick={() => setFinished(id)}>Überspringen</button>}
       {!playing && (

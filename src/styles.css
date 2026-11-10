@@ -157,7 +157,6 @@ dialog.confirm::backdrop { background: rgb(0 0 0 / .7); }
 .chat-form.gm textarea { resize: vertical; min-height: 2.6em; }
 .soundcheck { display: flex; flex-direction: column; gap: 8px; }
 .soundcheck p { margin: 0; }
-.soundcheck input[type='range'] { accent-color: var(--accent); }
 .briefing { font-size: 1.02rem; }
 .timer { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .timer span { font-size: .85rem; color: var(--muted); font-weight: 400; }
