@@ -2,22 +2,24 @@
 import type { Cutscene, CutsceneScene, GameState, Phase } from '../types'
 
 const SECONDS: Record<CutsceneScene, number> = {
-  intro: 9, prep: 8, control: 16, launch: 24, impact: 21, repair: 11, storm: 16, servers: 13, asteroids: 12, dish: 14, signal: 10, overload: 20, reactor: 11, restart: 11, bridge: 18, landing: 14, failure: 9, credits: 18,
+  intro: 9, prep: 10, control: 16, launch: 24, impact: 21, repair: 11, storm: 24, asteroids: 12, dish: 14, signal: 10, overload: 20, reactor: 11, restart: 11, bridge: 18, landing: 22, failure: 9, credits: 24,
 }
 
 type Script = Pick<Cutscene, 'scene' | 'title' | 'subtitle' | 'tone' | 'kw'>
 
 function script(from: Phase, s: GameState, kw: number): Script | null {
-  if (s.failure && from !== 'lessons') return { scene: 'failure', title: 'Mission in Gefahr', subtitle: s.failure, tone: 'bad' }
+  if (from === 'lessons') return null
+  if (s.failure) return { scene: 'failure', title: 'Mission in Gefahr', subtitle: s.failure, tone: 'bad' }
   switch (from) {
     case 'lobby':
       return { scene: 'intro', title: 'Mission Red Planet', subtitle: 'Flug zum Mars', tone: 'good' }
     case 'checkin':
       return { scene: 'prep', title: 'Startvorbereitung läuft', subtitle: 'Die ARES 1 wird betankt. Alle Sektionen an ihre Plätze!', tone: 'good' }
     case 'e1':
-      return s.e1.decision === 'go' && !s.e1.noGos
-        ? { scene: 'launch', title: 'Erfolgreich gestartet', subtitle: 'Die ARES 1 ist auf dem Weg zum Mars.', tone: 'good' }
-        : { scene: 'launch', title: 'Gestartet mit Verspätung', subtitle: 'Die ARES 1 ist unterwegs, aber das Startfenster war knapp.', tone: 'warn' }
+      // Verspätet ist der Start nur, wenn die Brücke das Startfenster per NO-GO verschoben hat.
+      return s.e1.noGos
+        ? { scene: 'launch', title: 'Gestartet mit Verspätung', subtitle: `Die Brücke hat das Startfenster ${s.e1.noGos === 1 ? 'einmal' : `${s.e1.noGos}-mal`} verschoben. Die ARES 1 ist jetzt unterwegs.`, tone: 'warn' }
+        : { scene: 'launch', title: 'Erfolgreich gestartet', subtitle: 'Die ARES 1 ist auf dem Weg zum Mars.', tone: 'good' }
     case 'e2':
       return s.e2.repaired
         ? { scene: 'repair', title: 'Hülle repariert', subtitle: 'Das Hitzeschild sitzt. Gute Teamarbeit!', tone: 'good' }
@@ -39,26 +41,26 @@ function script(from: Phase, s: GameState, kw: number): Script | null {
         : { scene: 'restart', title: 'Reaktor im Notbetrieb', subtitle: 'Es reicht gerade so. Der Mars kommt in Sicht.', tone: 'warn' }
     case 'e7':
       return { scene: 'landing', title: 'Touchdown!', subtitle: 'Die ARES 1 ist sicher auf dem Mars gelandet.', tone: 'good' }
-    case 'lessons':
-      return { scene: 'credits', title: 'Mission Red Planet', subtitle: 'Danke an alle Sektionen!', tone: 'good' }
     default:
       return null
   }
 }
+
+const CREDITS: Script = { scene: 'credits', title: 'Mission Red Planet', subtitle: 'Danke an alle Sektionen!', tone: 'good' }
 
 const FOLLOW_UPS: Partial<Record<CutsceneScene, Script>> = {
   prep: { scene: 'control', title: 'GO oder NO-GO?', subtitle: 'Leiter der Brücke: Meldet das Ergebnis der letzten Überprüfung an die Flugkontrolle.', tone: 'warn' },
   launch: { scene: 'impact', title: 'WIR SIND GETROFFEN – HÜLLENSCHADEN', subtitle: 'Wir brauchen umgehend Reparatur!', tone: 'bad' },
   signal: { scene: 'overload', title: 'Atomreaktor kurz vor der Explosion!', subtitle: 'Stromverbrauch muss sofort reduziert werden', tone: 'bad' },
   restart: { scene: 'bridge', title: 'Wir können ohne den richtigen Algorithmus nicht landen', subtitle: 'Wir brauchen diesen schnell, damit wir nicht auf dem Mars zerschellen!', tone: 'bad' },
-  repair: { scene: 'storm', title: 'Sonnen-Ionensturm!', subtitle: 'Wir brauchen alle Teams, um durch das Meteoritenfeld navigieren zu können.', tone: 'bad' },
-  storm: { scene: 'servers', title: 'Kommunikationsserver beschädigt', subtitle: 'Der Ionensturm hat die Server getroffen. Normale Nachrichten kommen nicht mehr durch.', tone: 'bad' },
+  repair: { scene: 'storm', title: 'Sonnen-Ionensturm!', subtitle: 'Der Sturm hat die Kommunikationsserver beschädigt, nur Emojis kommen noch durch. Wir brauchen alle Teams für das Meteoritenfeld.', tone: 'bad' },
+  landing: CREDITS,
   asteroids: { scene: 'dish', title: 'Kommunikationskanal ausgefallen', subtitle: 'Die Satellitenschüssel ist zerstört.', tone: 'bad' },
 }
 
-/** Manche Filme ziehen nach der Freigabe einen zweiten nach sich. */
-export function followUpCutscene(c: Cutscene, at: number): Cutscene | null {
-  const next = FOLLOW_UPS[c.scene]
+/** Manche Filme ziehen nach der Freigabe einen zweiten nach sich. Der Abspann folgt auch auf eine gescheiterte Landung. */
+export function followUpCutscene(c: Cutscene, at: number, phase: Phase): Cutscene | null {
+  const next = c.scene === 'failure' && phase === 'lessons' ? CREDITS : FOLLOW_UPS[c.scene]
   return next ? { ...next, id: c.id + 1, at, seconds: SECONDS[next.scene], released: false } : null
 }
 

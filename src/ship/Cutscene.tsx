@@ -4,26 +4,38 @@ import { E5_LIMIT_KW, E5_START_KW, ROLES } from '../game/content/flugZumMars'
 import { SHIELD_TARGET } from '../game/geometry'
 import { ROLE_IDS } from '../game/types'
 import type { Cutscene, CutsceneScene, RoleId } from '../game/types'
-import { COUNTDOWN, COUNTDOWN_STEP, DISH_HIT, IMPACT_HITS, countdownAt, isMuted, playFilm, setMuted, subscribeMuted } from './filmSound'
+import { COUNTDOWN, COUNTDOWN_STEP, DISH_HIT, IMPACT_HITS, STORM_INSIDE, STORM_SURGE, TOUCHDOWN, countdownAt, getVolume, isMuted, playAmbient, playFilm, setMuted, setVolume, subscribeSound } from './filmSound'
 import './cutscene.css'
 
-function Rocket({ flame = false }: { flame?: boolean }) {
+/** `float` lässt das Schiff im All sanft treiben, auch im Wartebild. */
+function Rocket({ flame = false, float = false }: { flame?: boolean; float?: boolean }) {
   return (
-    <svg className="c-rocket" viewBox="0 0 80 240" aria-hidden>
-      {flame && (
-        <g className="c-flame">
-          <path d="M26 196 Q40 300 54 196Z" fill="#ff8a2b" />
-          <path d="M32 196 Q40 262 48 196Z" fill="#ffe08a" />
-        </g>
-      )}
-      <path d="M8 196 L22 150 V196Z M72 196 L58 150 V196Z" fill="#7d8c9a" />
-      <path d="M40 2 C58 26 62 56 62 84 V192 H18 V84 C18 56 22 26 40 2Z" fill="#dfe6ec" />
-      <path d="M40 2 C50 15 56 30 59 46 H21 C24 30 30 15 40 2Z" fill="#a9b7c4" />
-      <rect x="18" y="176" width="44" height="16" fill="#a9b7c4" />
-      <rect x="26" y="192" width="28" height="8" fill="#3a4753" />
-      <circle cx="40" cy="74" r="9" fill="#0e2233" stroke="#f2b544" strokeWidth="3" />
-      <text x="40" y="120" textAnchor="middle" fontSize="9" fontWeight="800" fill="#33424f" letterSpacing="1">ARES 1</text>
-    </svg>
+    <div className={float ? 'c-float c-amb' : 'c-float'}>
+      <svg className="c-rocket" viewBox="0 0 80 240" aria-hidden>
+        <defs>
+          <linearGradient id="c-hull" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#f4f8fb" /><stop offset=".55" stopColor="#dfe6ec" /><stop offset="1" stopColor="#9aa8b5" />
+          </linearGradient>
+          <linearGradient id="c-nose" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#c3ced8" /><stop offset="1" stopColor="#74828f" />
+          </linearGradient>
+        </defs>
+        {flame && (
+          <g className="c-flame c-amb">
+            <path d="M26 196 Q40 300 54 196Z" fill="#ff8a2b" />
+            <path d="M32 196 Q40 262 48 196Z" fill="#ffe08a" />
+          </g>
+        )}
+        <path d="M8 196 L22 150 V196Z M72 196 L58 150 V196Z" fill="#7d8c9a" />
+        <path d="M40 2 C58 26 62 56 62 84 V192 H18 V84 C18 56 22 26 40 2Z" fill="url(#c-hull)" />
+        <path d="M40 2 C50 15 56 30 59 46 H21 C24 30 30 15 40 2Z" fill="url(#c-nose)" />
+        <rect x="18" y="176" width="44" height="16" fill="url(#c-nose)" />
+        <rect x="26" y="192" width="28" height="8" fill="#3a4753" />
+        <circle cx="40" cy="74" r="9" fill="#0e2233" stroke="#f2b544" strokeWidth="3" />
+        <path d="M34 70 A8 8 0 0 1 42 66" fill="none" stroke="#7fb6e0" strokeWidth="2" strokeLinecap="round" />
+        <text x="40" y="120" textAnchor="middle" fontSize="9" fontWeight="800" fill="#33424f" letterSpacing="1">ARES 1</text>
+      </svg>
+    </div>
   )
 }
 
@@ -34,7 +46,7 @@ const Pad = () => (
   </div>
 )
 
-const Stars = () => <div className="c-stars" />
+const Stars = () => <><div className="c-nebula" /><div className="c-stars far c-amb" /><div className="c-stars c-amb" /></>
 
 const RISE_FROM_KW = 120
 
@@ -78,12 +90,15 @@ function RisingKw({ held }: { held: boolean }) {
 }
 
 /** Crewmitglied von hinten, mit Blick zum Fenster. */
-function CrewMember({ x, shirt, className, arms = false, headset = false }: { x: number; shirt: string; className: string; arms?: boolean; headset?: boolean }) {
+/** `arms`: Hände am Kopf vor Schreck. `cheer`: Arme zum Jubel hochgerissen. */
+function CrewMember({ x, shirt, className, arms = false, cheer = false, headset = false }: { x: number; shirt: string; className: string; arms?: boolean; cheer?: boolean; headset?: boolean }) {
   return (
     <g transform={`translate(${x} 0)`}>
-      <g className={className}>
+      <g className={`${className} c-amb`}>
         <path d="M-34 360 V286 Q-34 256 0 256 Q34 256 34 286 V360 Z" fill={shirt} />
-        {arms
+        {cheer
+          ? <path d="M-30 276 L-50 224 L-60 178 M30 276 L50 224 L60 178" fill="none" stroke={shirt} strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" />
+          : arms
           ? <path className="c-arms" d="M-30 276 L-44 228 L-20 212 M30 276 L44 228 L20 212" fill="none" stroke={shirt} strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" />
           : <path d="M-30 276 L-40 330 M30 276 L40 330" fill="none" stroke={shirt} strokeWidth="13" strokeLinecap="round" />}
         <g className="c-head">
@@ -112,9 +127,12 @@ function ReactorCounter({ kw, held }: { kw: number; held: boolean }) {
   return <div className="c-kw">{held ? kw : value} kW</div>
 }
 
+/** Erst rückt die ARES zur Seite, dann rollt der Abspann. */
+const CREDITS_START = 2.2
+
 function Credits({ teams, roleOwner, title, subtitle, seconds }: Props & { title: string; subtitle: string; seconds: number }) {
   return (
-    <div className="c-credits" style={{ animationDuration: `${seconds}s` }}>
+    <div className="c-credits" style={{ animationDuration: `${seconds - CREDITS_START}s`, animationDelay: `${CREDITS_START}s` }}>
       <h2>{title}</h2>
       <p>Die Crew der ARES 1</p>
       {teams.map((t) => (
@@ -132,14 +150,16 @@ function Credits({ teams, roleOwner, title, subtitle, seconds }: Props & { title
   )
 }
 
-function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & Props) {
+function Stage({ c, teams, roleOwner, held, jump }: { c: Cutscene; held: boolean; jump: boolean } & Props) {
+  /** Verzögerung für Dauerläufer: Wer den Film überspringt oder später kommt, sieht sie sofort. */
+  const d = (start: number, stagger = 0) => `${jump ? stagger : start + stagger}s`
   const scenes: Record<CutsceneScene, React.ReactNode> = {
     intro: <><Pad /><div className="c-ship c-on-pad"><Rocket /></div></>,
     prep: (
       <>
         <Pad />
-        <i className="c-beam left" /><i className="c-beam right" />
-        <div className="c-ship c-on-pad"><Rocket /><i className="c-vapor" /></div>
+        <i className="c-beam left c-amb" /><i className="c-beam right c-amb" />
+        <div className="c-ship c-on-pad"><Rocket /><i className="c-vapor c-amb" /></div>
         <div className="c-clock">T − 30:00</div>
       </>
     ),
@@ -154,7 +174,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
           <rect x="240" y="60" width="6" height="88" fill="#6d7b89" />
           <text x="400" y="62" textAnchor="middle" fontSize="20" fontWeight="800" fill="#5be08a">ARES 1</text>
           <text x="400" y="92" textAnchor="middle" fontSize="18" fontWeight="800" fill="#ffd36b" fontFamily="ui-monospace, monospace">T − 30:00</text>
-          <text x="400" y="122" textAnchor="middle" fontSize="13" fontWeight="800" fill="#ff8a6b" className="c-deckalert">LETZTE ÜBERPRÜFUNG</text>
+          <text x="400" y="122" textAnchor="middle" fontSize="13" fontWeight="800" fill="#ff8a6b" className="c-deckalert c-amb">LETZTE ÜBERPRÜFUNG</text>
           <path d="M-500 214 H1140 V900 H-500 Z" fill="#2c3844" />
           <path d="M-500 214 H1140 V232 H-500 Z" fill="#46545f" />
           {[[52, 'TREIBSTOFF'], [255, 'WETTER'], [458, 'BRÜCKE']].map(([x, label]) => (
@@ -188,14 +208,14 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
           {METEORS.map(([top, delay, dur, size], i) => <i key={i} className="c-meteor" style={{ top: `${top}%`, width: size * 3.4, height: size, animationDelay: `${delay}s`, animationDuration: `${dur}s` }} />)}
           {HITS.map((t, i) => <i key={i} className="c-micro" style={{ top: `${49 + (i % 3) * 2}%`, animationDelay: `${t - 0.4}s` }} />)}
           <div className="c-ship c-hitship">
-            <Rocket flame />
+            <Rocket flame float />
             {HITS.map((t, i) => <i key={i} className="c-hit" style={{ top: `${22 + i * 13}%`, left: `${i % 2 ? 66 : 34}%`, animationDelay: `${t}s` }} />)}
-            {[0, 1, 2].map((i) => <i key={i} className="c-leak" style={{ animationDelay: `${15.2 + i * 0.7}s` }} />)}
+            {[0, 1, 2].map((i) => <i key={i} className="c-leak c-amb" style={{ animationDelay: d(15.2, i * 0.7) }} />)}
           </div>
         </div>
         <div className="c-reds">
-          <i className="c-redglow" />
-          {['tl', 'tr', 'bl', 'br'].map((p) => <i key={p} className={`c-beacon ${p}`} />)}
+          <i className="c-redglow c-amb" />
+          {['tl', 'tr', 'bl', 'br'].map((p) => <i key={p} className={`c-beacon c-amb ${p}`} />)}
         </div>
         <div className="c-msg c-alarmword">ALARM</div>
         <div className="c-msg c-ahead">METEORITEN VORAUS</div>
@@ -225,43 +245,43 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
           {FAR_ROCKS.map(([x, y, size], i) => <i key={i} style={{ left: `${x}%`, top: `${y}%`, width: size, height: size }} />)}
         </div>
         <div className="c-ship c-stormship">
-          <Rocket flame />
+          <Rocket flame float />
           <svg className="c-arcs" viewBox="0 0 80 240" aria-hidden>
             <polyline points="22,50 34,70 18,92 36,118 20,140" />
             <polyline points="60,70 46,92 62,120 44,146 60,170" />
           </svg>
         </div>
         <i className="c-stormflash" />
+        {/* Schnitt ins Schiff: Der Sturm legt die Kommunikationsserver lahm. */}
+        <div className="c-deck c-serverroom" style={{ animationDelay: `${STORM_INSIDE}s` }}>
+          <svg viewBox="0 0 640 360" aria-hidden>
+            <path d="M-500 340 H1140 V900 H-500 Z" fill="#141a20" />
+            {[30, 150, 270, 390, 510].map((x, rack) => (
+              <g key={x}>
+                <rect x={x} y="20" width="100" height="320" rx="4" fill="#232d36" stroke="#46545f" strokeWidth="3" />
+                {Array.from({ length: 8 }, (_, row) => (
+                  <g key={row}>
+                    <rect x={x + 10} y={32 + row * 37} width="80" height="28" rx="2" fill="#10161c" />
+                    {[0, 1, 2].map((led) => <circle key={led} cx={x + 22 + led * 12} cy={46 + row * 37} r="3.4" className="c-led" style={{ animationDelay: `${STORM_SURGE + 0.3 + rack * 0.45 + row * 0.05}s` }} />)}
+                    {(rack * 3 + row) % 5 === 0 && <circle cx={x + 22} cy={46 + row * 37} r="3.4" className="c-ledflicker c-amb" style={{ animationDelay: d(STORM_SURGE + 3, row * 0.13) }} />}
+                    <rect x={x + 62} y={42 + row * 37} width="20" height="8" fill="#2c3844" />
+                  </g>
+                ))}
+              </g>
+            ))}
+            <g className="c-serversparks" style={{ animationDelay: `${STORM_SURGE}s` }}>{[[176, 110], [320, 210], [438, 70], [556, 250]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="6" className="c-dishspark c-amb" style={{ animationDelay: d(STORM_SURGE) }} />)}</g>
+            {[[176, 110], [438, 70]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="14" className="c-serversmoke c-amb" style={{ animationDelay: d(STORM_SURGE + 0.8) }} />)}
+          </svg>
+          <i className="c-stormflash" style={{ animationDelay: `${STORM_SURGE - 0.2}s` }} />
+          <div className="c-reds" style={{ animationDelay: `${STORM_SURGE}s` }}><i className="c-redglow c-amb" /></div>
+        </div>
       </>
-    ),
-    servers: (
-      <div className="c-deck">
-        <svg viewBox="0 0 640 360" aria-hidden>
-          <path d="M-500 340 H1140 V900 H-500 Z" fill="#141a20" />
-          {[30, 150, 270, 390, 510].map((x, rack) => (
-            <g key={x}>
-              <rect x={x} y="20" width="100" height="320" rx="4" fill="#232d36" stroke="#46545f" strokeWidth="3" />
-              {Array.from({ length: 8 }, (_, row) => (
-                <g key={row}>
-                  <rect x={x + 10} y={32 + row * 37} width="80" height="28" rx="2" fill="#10161c" />
-                  {[0, 1, 2].map((led) => <circle key={led} cx={x + 22 + led * 12} cy={46 + row * 37} r="3.4" className="c-led" style={{ animationDelay: `${3.3 + rack * 0.45 + row * 0.05}s` }} />)}
-                  <rect x={x + 62} y={42 + row * 37} width="20" height="8" fill="#2c3844" />
-                </g>
-              ))}
-            </g>
-          ))}
-          <g className="c-serversparks">{[[176, 110], [320, 210], [438, 70], [556, 250]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="6" className="c-dishspark" style={{ animationDelay: '3.2s' }} />)}</g>
-          {[[176, 110], [438, 70]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="14" className="c-serversmoke" />)}
-        </svg>
-        <i className="c-stormflash" style={{ animationDelay: '3s' }} />
-        <div className="c-reds" style={{ animationDelay: '3.2s' }}><i className="c-redglow" /></div>
-      </div>
     ),
     asteroids: (
       <>
         <Stars />
-        {ASTEROIDS.map(([top, delay, dur, size], i) => <i key={i} className="c-rock" style={{ top: `${top}%`, width: size, height: size, animationDelay: `${delay}s`, animationDuration: `${dur}s` }} />)}
-        <div className="c-ship c-weaving"><Rocket flame /></div>
+        {ASTEROIDS.map(([top, delay, dur, size], i) => <i key={i} className="c-rock c-amb" style={{ top: `${top}%`, width: size, height: size, animationDelay: `${delay}s`, animationDuration: `${dur}s` }} />)}
+        <div className="c-ship c-weaving"><Rocket flame float /></div>
         <div className="c-glitch" />
       </>
     ),
@@ -288,7 +308,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
               <g className="c-dishbroken">
                 <path d="M193 242 V186 L199 176 L203 188 L207 180 V242 Z" fill="#6d7b89" />
                 <path d="M186 186 Q176 214 214 214 L206 190 Z" fill="#c3ccd5" stroke="#8a98a6" strokeWidth="3" />
-                <circle cx="201" cy="180" r="5" className="c-dishspark" />
+                <circle cx="201" cy="180" r="5" className="c-dishspark c-amb" style={{ animationDelay: d(DISH_HIT + 0.2) }} />
               </g>
               {[[-90, -80], [80, -110], [130, 20], [-120, 30], [20, -140]].map(([dx, dy], i) => (
                 <polygon key={i} points="192,112 214,106 208,132" className="c-dishfrag" style={{ '--dx': `${dx}px`, '--dy': `${dy}px` } as CSSProperties} />
@@ -301,14 +321,14 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
             </svg>
           </div>
         </div>
-        <div className="c-reds" style={{ animationDelay: `${DISH_HIT + 0.3}s` }}><i className="c-redglow" /></div>
+        <div className="c-reds" style={{ animationDelay: `${DISH_HIT + 0.3}s` }}><i className="c-redglow c-amb" /></div>
       </>
     ),
     signal: (
       <>
         <Stars />
-        <div className="c-ship c-cruise"><Rocket flame /></div>
-        {[0, 1, 2].map((i) => <i key={i} className="c-ring" style={{ animationDelay: `${i * 0.9}s` }} />)}
+        <div className="c-ship c-cruise"><Rocket flame float /></div>
+        {[0, 1, 2].map((i) => <i key={i} className="c-ring c-amb" style={{ animationDelay: `${i * 0.9}s` }} />)}
         <div className="c-bars">{[0, 1, 2, 3, 4].map((i) => <i key={i} style={{ height: `${20 + i * 18}%`, animationDelay: `${1.2 + i * 0.8}s` }} />)}</div>
       </>
     ),
@@ -326,7 +346,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
               <path d="M-900 60 H60 M340 60 H1300 M-900 190 H60 M340 190 H1300" stroke="#3a4753" strokeWidth="14" />
               <rect x="60" y="14" width="280" height="212" rx="46" fill="#39454f" stroke="#6d7b89" strokeWidth="6" />
               <rect x="96" y="50" width="208" height="142" rx="24" fill="#0b1622" />
-              <circle cx="200" cy="121" r="56" className="c-heat" />
+              <g className="c-heatpulse"><circle cx="200" cy="121" r="56" className="c-heat" /></g>
               {[122, 158, 232, 268].map((x) => <rect key={x} x={x} y="50" width="10" height="86" fill="#6d7b89" />)}
               <circle cx="200" cy="32" r="14" fill="#f2b544" />
               {[-90, 30, 150].map((a) => <path key={a} d={sector(200, 32, 3.5, 12.5, a - 30, a + 30)} fill="#141a20" />)}
@@ -336,18 +356,18 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
           </div>
         </div>
         <div className="c-reds" style={{ animationDelay: '13.5s' }}>
-          <i className="c-redglow" />
-          {['tl', 'tr', 'bl', 'br'].map((p) => <i key={p} className={`c-beacon ${p}`} />)}
+          <i className="c-redglow c-amb" />
+          {['tl', 'tr', 'bl', 'br'].map((p) => <i key={p} className={`c-beacon c-amb ${p}`} />)}
         </div>
         <div className="c-msg c-alarmword c-alarmstay">ALARM</div>
       </>
     ),
-    reactor: <><div className="c-core" /><ReactorCounter kw={c.kw ?? 150} held={held} /></>,
+    reactor: <><div className="c-corepulse"><div className="c-core" /></div><ReactorCounter kw={c.kw ?? 150} held={held} /></>,
     restart: (
       <>
         <Stars />
         <div className="c-mars" />
-        <div className="c-ship c-approach"><Rocket flame /></div>
+        <div className="c-ship c-approach"><Rocket flame float /></div>
       </>
     ),
     bridge: (
@@ -373,7 +393,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
               <g key={x as number}>
                 <rect x={x as number} y="176" width="130" height="50" rx="5" fill="#0b1622" stroke="#6d7b89" strokeWidth="3" />
                 <text x={(x as number) + 65} y="195" textAnchor="middle" fontSize="11" fontWeight="700" fill="#cfd8e2">{top}</text>
-                <text x={(x as number) + 65} y="215" textAnchor="middle" fontSize="13" fontWeight="800" fill="#ff5a4d" className="c-deckalert">{text}</text>
+                <text x={(x as number) + 65} y="215" textAnchor="middle" fontSize="13" fontWeight="800" fill="#ff5a4d" className="c-deckalert c-amb">{text}</text>
               </g>
             ))}
             <CrewMember x={218} shirt="#3f6fb5" className="c-look" />
@@ -381,25 +401,47 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
             <CrewMember x={624} shirt="#3f8f6a" className="c-pace" />
           </svg>
         </div>
-        <div className="c-reds" style={{ animationDelay: '12s' }}><i className="c-redglow" /></div>
+        <div className="c-reds" style={{ animationDelay: '12s' }}><i className="c-redglow c-amb" /></div>
       </>
     ),
     landing: (
       <>
         <Stars />
         <div className="c-mars-sky" />
+        {[[18, 22, '#ffd36b', 0], [78, 18, '#5be08a', 0.7], [36, 12, '#8fa8e8', 1.3], [64, 30, '#ff8a6b', 1.9], [88, 40, '#ffd36b', 2.4], [8, 42, '#5be08a', 2.9]].map(([x, y, color, delay]) => (
+          <i key={x} className="c-firework c-amb" style={{ left: `${x}%`, top: `${y}%`, color: color as string, animationDelay: d(TOUCHDOWN + 2.4, delay as number) }} />
+        ))}
         <div className="c-mars-ground" />
         <div className="c-ship c-descent"><Rocket flame /></div>
-        {[-18, -8, 8, 18].map((x) => <i key={x} className="c-dust" style={{ left: `calc(50% + ${x}vh)`, animationDelay: `${8.4 + Math.abs(x) / 60}s` }} />)}
-        {Array.from({ length: 28 }, (_, i) => <i key={i} className="c-confetti" style={{ left: `${(i * 37) % 100}%`, animationDelay: `${9.6 + (i % 7) * 0.25}s`, background: ['#f2b544', '#5be08a', '#8fa8e8', '#ff8a6b'][i % 4] }} />)}
+        <svg className="c-flag" viewBox="0 0 40 80" aria-hidden>
+          <rect x="4" y="0" width="3" height="80" fill="#dfe6ec" />
+          <path className="c-flagcloth c-amb" d="M7 3 H36 L30 13 L36 23 H7 Z" fill="#f2b544" />
+        </svg>
+        {[-18, -8, 8, 18].map((x) => <i key={x} className="c-dust" style={{ left: `calc(50% + ${x}vh)`, animationDelay: `${TOUCHDOWN - 0.2 + Math.abs(x) / 60}s` }} />)}
+        {Array.from({ length: 36 }, (_, i) => <i key={i} className="c-confetti c-amb" style={{ left: `${(i * 37) % 100}%`, animationDelay: d(TOUCHDOWN + 1, (i % 9) * 0.45), animationDuration: `${3.4 + (i % 4) * 0.5}s`, background: ['#f2b544', '#5be08a', '#8fa8e8', '#ff8a6b'][i % 4] }} />)}
+        <div className="c-crowd" style={{ animationDelay: `${TOUCHDOWN + 2.6}s` }}>
+          <div className="c-bubble left" style={{ animationDelay: `${TOUCHDOWN + 3.6}s` }}>Geschafft!</div>
+          <div className="c-bubble right" style={{ animationDelay: `${TOUCHDOWN + 5.6}s` }}>Wir sind auf dem Mars!</div>
+          <svg viewBox="0 160 640 200" preserveAspectRatio="xMidYMax meet" aria-hidden>
+            {[[70, '#4a5a78'], [195, '#3f6fb5'], [320, '#b5563f'], [445, '#3f8f6a'], [570, '#8a5fb5']].map(([x, shirt], i) => (
+              <g key={x} className="c-cheer c-amb" style={{ animationDelay: `${i * 0.11}s` }}>
+                <CrewMember x={x as number} shirt={shirt as string} className="c-still" cheer />
+              </g>
+            ))}
+          </svg>
+        </div>
       </>
     ),
-    failure: <><Stars /><div className="c-alarm" /><div className="c-ship c-drift"><Rocket /></div></>,
+    failure: <><Stars /><div className="c-alarm c-amb" /><div className="c-ship c-drift"><Rocket float /></div></>,
     credits: (
       <>
         <Stars />
         <div className="c-mars-sky" />
         <div className="c-mars-ground still" />
+        <svg className="c-flag still" viewBox="0 0 40 80" aria-hidden>
+          <rect x="4" y="0" width="3" height="80" fill="#dfe6ec" />
+          <path className="c-flagcloth c-amb" d="M7 3 H36 L30 13 L36 23 H7 Z" fill="#f2b544" />
+        </svg>
         <div className="c-ship c-landed"><Rocket /></div>
         <Credits teams={teams} roleOwner={roleOwner} title={c.title} subtitle={c.subtitle} seconds={c.seconds} />
       </>
@@ -409,7 +451,7 @@ function Stage({ c, teams, roleOwner, held }: { c: Cutscene; held: boolean } & P
 }
 
 const CAPTION_AT: Record<CutsceneScene, number> = {
-  intro: 2.5, prep: 3, control: 11, launch: 19.1, impact: 16, repair: 6, storm: 11, servers: 8.5, asteroids: 7.5, dish: 10, signal: 5.5, overload: 17.4, reactor: 6, restart: 6, bridge: 12.5, landing: 9.5, failure: 2.5, credits: 0,
+  intro: 2.5, prep: 3, control: 11, launch: 19.1, impact: 16, repair: 6, storm: 19, asteroids: 7.5, dish: 10, signal: 5.5, overload: 17.4, reactor: 6, restart: 6, bridge: 12.5, landing: 9.5, failure: 2.5, credits: 0,
 }
 
 interface Props {
@@ -426,21 +468,43 @@ interface OverlayProps extends Props {
   hostLost?: boolean
 }
 
-/** Zeigt den Film bei allen gleichzeitig. Danach bleibt das Schlussbild stehen, bis die Spielleitung freigibt. */
+/**
+ * Zeigt den Film bei allen gleichzeitig. Danach läuft das Schlussbild mit leiser Grundmusik weiter,
+ * bis die Spielleitung freigibt.
+ */
 export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRelease, nextTitle, hostLost = false }: OverlayProps) {
   const [finished, setFinished] = useState(0)
+  /** Film, der bis zum Ende lief. Nur dann stehen alle Dauerläufer schon an ihrem Platz. */
+  const [watched, setWatched] = useState(0)
   const skip = useRef<HTMLButtonElement>(null)
-  const muted = useSyncExternalStore(subscribeMuted, isMuted)
+  const muted = useSyncExternalStore(subscribeSound, isMuted)
+  const volume = useSyncExternalStore(subscribeSound, getVolume)
   const id = cutscene?.id ?? 0
   const expired = cutscene ? Date.now() + offset - cutscene.at >= cutscene.seconds * 1000 : true
   const active = Boolean(cutscene) && !cutscene?.released
   const playing = active && !expired && finished !== id
 
+  // Nach der letzten Freigabe blendet der Film ins Spiel aus. Zwischen zwei Filmen bleibt es dunkel.
+  const [wasActive, setWasActive] = useState(active)
+  const [leaving, setLeaving] = useState(false)
+  if (wasActive !== active) {
+    setWasActive(active)
+    setLeaving(!active)
+  }
+  useEffect(() => {
+    if (!leaving) return
+    const timer = setTimeout(() => setLeaving(false), 450)
+    return () => clearTimeout(timer)
+  }, [leaving])
+
   useEffect(() => {
     if (!playing || !cutscene) return
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
     const left = cutscene.at + cutscene.seconds * 1000 - (Date.now() + offset)
-    const timer = setTimeout(() => setFinished(id), reduced ? Math.min(left, 5000) : left)
+    const timer = setTimeout(() => {
+      setFinished(id)
+      if (!reduced) setWatched(id)
+    }, reduced ? Math.min(left, 5000) : left)
     return () => clearTimeout(timer)
   }, [playing, id, cutscene, offset])
 
@@ -452,21 +516,34 @@ export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRele
     return playFilm(cutscene, () => (Date.now() + offset - cutscene.at) / 1000, CAPTION_AT[cutscene.scene], reduced)
   }, [playing, id])
 
-  if (!active || !cutscene) return null
+  // Wartebild: Grundmusik, bis die Spielleitung freigibt.
+  const waiting = active && !playing
+  useEffect(() => {
+    if (!waiting || !cutscene) return
+    return playAmbient(cutscene)
+  }, [waiting, id])
+
+  if (!active || !cutscene) return leaving ? <div className="cut-wrap leaving" aria-hidden /> : null
   const credits = cutscene.scene === 'credits'
+  const jump = !playing && watched !== id
   return (
-    <div key={cutscene.id} className={`cut cut-${cutscene.scene}${playing ? '' : ' held'}`} role="dialog" aria-label={`Film: ${cutscene.title}`} data-testid="cutscene">
-      <Stage c={cutscene} teams={teams} roleOwner={roleOwner} held={!playing} />
-      {!credits && (
-        <div className={`c-caption ${cutscene.tone}`} style={{ animationDelay: `${CAPTION_AT[cutscene.scene]}s` }}>
-          <h1>{cutscene.title}</h1>
-          <p>{cutscene.subtitle}</p>
-        </div>
-      )}
-      <button className="c-skip c-mute" aria-pressed={muted} onClick={() => setMuted(!muted)}>
-        <span aria-hidden>{muted ? '🔇' : '🔊'}</span> Musik {muted ? 'einschalten' : 'ausschalten'}
-      </button>
-      {playing && <button ref={skip} className="c-skip" onClick={() => setFinished(id)}>Überspringen</button>}
+    <div className="cut-wrap" role="dialog" aria-label={`Film: ${cutscene.title}`} data-testid="cutscene">
+      <div key={cutscene.id} className={`cut cut-${cutscene.scene}${playing ? '' : ' held'}${jump ? ' jump' : ''}`}>
+        <Stage c={cutscene} teams={teams} roleOwner={roleOwner} held={!playing} jump={jump} />
+        {!credits && (
+          <div className={`c-caption ${cutscene.tone}`} style={{ animationDelay: `${CAPTION_AT[cutscene.scene]}s` }}>
+            <h1>{cutscene.title}</h1>
+            <p>{cutscene.subtitle}</p>
+          </div>
+        )}
+      </div>
+      <div className="c-sound">
+        <button className="c-skip" aria-pressed={muted} onClick={() => setMuted(!muted)}>
+          <span aria-hidden>{muted ? '🔇' : '🔊'}</span> Musik {muted ? 'einschalten' : 'ausschalten'}
+        </button>
+        <input type="range" aria-label="Lautstärke" min={0} max={1} step={0.05} value={volume} disabled={muted} onChange={(e) => setVolume(Number(e.target.value))} />
+      </div>
+      {playing && <button ref={skip} className="c-skip c-skipfilm" onClick={() => setFinished(id)}>Überspringen</button>}
       {!playing && (
         <div className="c-wait" data-testid="cutscene-wait">
           {onRelease

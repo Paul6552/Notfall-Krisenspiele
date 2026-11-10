@@ -4,15 +4,14 @@ import { ClientSession } from '../net/client'
 import { isLocalNet } from '../net/transport'
 import { deleteClient, loadClient, loadGame } from '../storage/db'
 import { CutsceneOverlay } from '../ship/Cutscene'
-import { setMuted } from '../ship/filmSound'
 import { ShipScene } from '../ship/Ship'
 import { GameRoom } from './GameRoom'
 import { CenterMessage, Notice } from './shared'
+import { SoundCheck } from './SoundCheck'
 
 export function PlayScreen({ code }: { code: string }) {
   const [name, setName] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
-  const [music, setMusic] = useState(true)
 
   useEffect(() => {
     void (async () => {
@@ -30,10 +29,10 @@ export function PlayScreen({ code }: { code: string }) {
         <a className="back" href="#/">← Zurück</a>
         <h1>Beitreten</h1>
         <p className="lead">Spielnummer <strong>{code}</strong></p>
-        <form className="card" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { setMuted(!music); setName(draft.trim()) } }}>
+        <form className="card" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) setName(draft.trim()) }}>
           <label htmlFor="org">Name eurer Organisation</label>
           <input id="org" autoFocus placeholder="z. B. Organisation Mustermann" value={draft} onChange={(e) => setDraft(e.target.value)} />
-          <label className="radio"><input type="checkbox" checked={music} onChange={(e) => setMusic(e.target.checked)} /> Musik und Klänge in den Filmen</label>
+          <SoundCheck />
           <button className="btn primary">Beitreten</button>
         </form>
       </div>
@@ -89,6 +88,10 @@ function Connected({ session, code, onReset }: { session: ClientSession; code: s
             <h1>Willkommen an Bord</h1>
             <p>Ihr seid als <strong>{view.teams.find((t) => t.id === view.me)?.name}</strong> dabei. Der Spielleiter vergibt jetzt die Rollen und startet die Übung.</p>
             <p className="muted">{view.teams.length} von {view.teamCount} Teams sind da.</p>
+          </section>
+          <section className="card">
+            <h2>Ton prüfen</h2>
+            <SoundCheck />
           </section>
         </div>
         <aside className="lobby-ship">

@@ -143,6 +143,21 @@ dialog.confirm::backdrop { background: rgb(0 0 0 / .7); }
 .ship-col { grid-area: ship; position: sticky; top: 12px; }
 .work { grid-area: work; min-width: 0; }
 .chat { grid-area: chat; position: sticky; top: 12px; max-height: calc(100vh - 24px); }
+/* Spielleitung: Funk oben, darunter immer sichtbar der Ablauf mit „Weiter“ und „Pausieren“. */
+.side-col { grid-area: chat; position: sticky; top: 12px; max-height: calc(100vh - 24px); min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+.side-col .chat { position: static; max-height: none; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.side-col .chat-list { min-height: 110px; }
+.flow { flex: none; }
+.flow .btn { white-space: normal; min-width: 0; }
+.flow .btn.grow { flex: 1; }
+.gm-sender { display: flex; flex-direction: column; gap: 6px; }
+.gm-sender p { margin: 0; }
+.chat-form.gm { grid-template-columns: minmax(0, 1fr) auto; }
+.chat-form.gm select { grid-column: 1 / -1; }
+.chat-form.gm textarea { resize: vertical; min-height: 2.6em; }
+.soundcheck { display: flex; flex-direction: column; gap: 8px; }
+.soundcheck p { margin: 0; }
+.soundcheck input[type='range'] { accent-color: var(--accent); }
 .briefing { font-size: 1.02rem; }
 .timer { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .timer span { font-size: .85rem; color: var(--muted); font-weight: 400; }
@@ -160,7 +175,7 @@ dialog.confirm::backdrop { background: rgb(0 0 0 / .7); }
 }
 @media (max-width: 780px) {
   .room-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'status' 'work' 'chat' 'ship'; }
-  .chat { position: static; max-height: none; }
+  .chat, .side-col { position: static; max-height: none; }
   .chat-list { max-height: 300px; }
 }
 .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; border-bottom: 1px solid var(--line); }

@@ -24,11 +24,23 @@ Das Spiel läuft unter **https://paul6552.github.io/Notfall-Krisenspiele/**. Jed
 
 ### Filme zwischen den Ereignissen
 
-Nach jedem „Weiter“ läuft bei allen gleichzeitig ein kurzer Film von 8 bis 24 Sekunden: vom Start der ARES 1 bis zur Landung auf dem Mars, am Schluss ein Abspann mit allen Organisationen. Der Ausgang hängt vom Spielverlauf ab, zum Beispiel „Erfolgreich gestartet“ oder „Gestartet mit Verspätung“.
+Nach jedem „Weiter“ läuft bei allen gleichzeitig ein kurzer Film von 9 bis 24 Sekunden: vom Start der ARES 1 bis zur Landung auf dem Mars. Der Ausgang hängt vom Spielverlauf ab. „Gestartet mit Verspätung“ erscheint zum Beispiel nur, wenn die Brücke das Startfenster mit einem NO-GO verschoben hat.
 
-Die Filme sind im Browser animiert und brauchen keine Videodateien. Vor Ereignis 1 fordert die Flugkontrolle in einem zweiten Film die letzte Überprüfung an. Nach dem Start folgt ein zweiter Film: Alarm, Meteoritenschauer und Treffer, die zum Hüllenschaden führen. Vor Ereignis 3 trifft in einem zweiten Film der Ionensturm das Schiff, in einem dritten sieht man die beschädigten Kommunikationsserver. Auch vor Ereignis 4 gibt es einen zweiten Film, in dem ein Meteorit die Satellitenschüssel trifft, vor Ereignis 5 einen, in dem der Reaktor auf 410 kW steigt, und vor Ereignis 7 einen mit der nervösen Crew auf der Brücke. Am Ende bleibt das Schlussbild stehen, bis die Spielleitung mit „Weiter für alle“ freigibt. Erst dann sehen alle das nächste Ereignis, und erst dann läuft dessen Uhr. Jede Person kann den Film für sich überspringen und landet dann ebenfalls beim Schlussbild. Die Spielleitung kann sie in der Lobby abschalten.
+Die Filme sind im Browser animiert und brauchen keine Videodateien. Manche Übergänge haben zwei Filme hintereinander:
 
-Die Klänge entstehen im Browser, es gibt keine Audiodateien. Beim Beitritt wählt jedes Team „Musik und Klänge“, standardmäßig an. Im Film schaltet jede Person den Ton für das eigene Gerät um, die Spielleitung kann das nicht für andere festlegen. Browser spielen Ton erst nach einem Klick auf der Seite: Wer während eines Films neu lädt, hört ihn erst nach dem nächsten Klick.
+- Vor Ereignis 1 fordert die Flugkontrolle die letzte Überprüfung an.
+- Nach dem Start folgen Alarm, Meteoritenschauer und die Treffer, die zum Hüllenschaden führen.
+- Vor Ereignis 3 trifft der Sonnen-Ionensturm das Schiff. Derselbe Film zeigt, wie der Sturm die Kommunikationsserver lahmlegt.
+- Vor Ereignis 4 trifft ein Meteorit die Satellitenschüssel, vor Ereignis 5 steigt der Reaktor auf 410 kW, vor Ereignis 7 wartet die nervöse Crew auf der Brücke.
+- Nach der Landung feiert die Crew. Danach rückt die ARES 1 zur Seite und der Abspann mit allen Organisationen läuft. Erst dann beginnt „Lessons Learned“.
+
+Am Ende jedes Films läuft das Schlussbild weiter: Triebwerke brennen, Sterne ziehen vorbei, dazu spielt leise Grundmusik. Das bleibt so, bis die Spielleitung mit „Weiter für alle“ freigibt. Erst dann sehen alle das nächste Ereignis, und erst dann läuft dessen Uhr. Zwischen zwei Filmen bleibt das Bild dunkel, das Spiel ist dabei nicht zu sehen. Jede Person kann den Film für sich überspringen und landet dann ebenfalls beim Schlussbild. Die Spielleitung kann die Filme in der Lobby abschalten.
+
+Musik und Klänge entstehen im Browser, es gibt keine Audiodateien. Ein wiederkehrendes Thema verbindet die Filme. Vor dem Spiel prüft jede Person den Ton mit „Musik testen“: beim Beitritt, im Warteraum und in der Lobby der Spielleitung. Dort und in jedem Film lassen sich Musik und Lautstärke für das eigene Gerät einstellen, die Spielleitung kann das nicht für andere festlegen. Browser spielen Ton erst nach einem Klick auf der Seite: Wer während eines Films neu lädt, hört ihn erst nach dem nächsten Klick.
+
+### Konsole der Spielleitung
+
+Rechts steht der Funk, direkt darunter die Karte „Ablauf“ mit „Weiter“ und „Pausieren“. Meldungen von außen spielt die Spielleitung im Funk ein: Sie ändert dazu das Feld „Absender“, zum Beispiel auf „Unbekannter Sender“. In Ereignis 6 gibt es dort Vorlagen für Falschmeldungen.
 
 ### Wenn der Spielleiter-Browser zugeht
 
@@ -62,7 +74,7 @@ Alle Texte, Rätsel, die Karte, die Geräte und die Sprüche für Ereignis 6 ste
 
 Sektoren-Codes stehen in `SECTOR_CODES` und müssen zu den Fragmenten in `E7_FRAGMENTS` passen.
 
-Die Texte der Filme stehen in `src/game/content/cutscenes.ts`, die Szenen in `src/ship/Cutscene.tsx` und `src/ship/cutscene.css`.
+Die Texte der Filme stehen in `src/game/content/cutscenes.ts`, die Szenen in `src/ship/Cutscene.tsx` und `src/ship/cutscene.css`. Die Musik je Film steht in `src/ship/filmSound.ts`, die Instrumente und das Thema in `src/ship/music.ts`.
 
 ## Tests
 

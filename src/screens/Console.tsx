@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { E6_INJECTS, PHASE_INFO, ROLES, SECTOR_ORDER, roleLabel } from '../game/content/flugZumMars'
+import { PHASE_INFO, ROLES, SECTOR_ORDER, roleLabel } from '../game/content/flugZumMars'
 import { Lessons } from '../events/Lessons'
 import { project } from '../game/projection'
 import { advanceWarnings } from '../game/reducer'
-import { ALL, GM, PHASES, ROLE_IDS } from '../game/types'
+import { GM, PHASES, ROLE_IDS } from '../game/types'
 import type { Action, GameState, ShipStatus, View } from '../game/types'
 import { ShipScene } from '../ship/Ship'
 import { Chat } from './Chat'
@@ -62,44 +62,6 @@ function ConfirmAdvance({ state, onCancel, onConfirm }: { state: GameState; onCa
   )
 }
 
-function Injects({ state, act }: { state: GameState; act: (a: Action) => void }) {
-  const [text, setText] = useState('')
-  const [label, setLabel] = useState('Unbekannter Sender')
-  const [org, setOrg] = useState(state.teams[0]?.name ?? '')
-  const [to, setTo] = useState(ALL)
-  return (
-    <section className="card">
-      <h2>Meldung einspielen</h2>
-      {state.phase === 'e6' && (
-        <div className="row wrap">
-          <label className="field">Organisation in der Vorlage
-            <select value={org} onChange={(e) => setOrg(e.target.value)}>{state.teams.map((t) => <option key={t.id}>{t.name}</option>)}</select>
-          </label>
-          <label className="field grow">Vorlage
-            <select value="" onChange={(e) => e.target.value && setText(e.target.value.replaceAll('{org}', org))}>
-              <option value="">Vorlage wählen</option>
-              {E6_INJECTS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </label>
-        </div>
-      )}
-      <form className="stack" onSubmit={(e) => { e.preventDefault(); act({ type: 'inject', text, label, to }); setText('') }}>
-        <textarea aria-label="Text der Meldung" rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="Text der Meldung" />
-        <div className="row wrap">
-          <label className="field grow">Absender<input value={label} onChange={(e) => setLabel(e.target.value)} /></label>
-          <label className="field">An
-            <select value={to} onChange={(e) => setTo(e.target.value)}>
-              <option value={ALL}>Alle</option>
-              {state.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </label>
-          <button className="btn small">Einspielen</button>
-        </div>
-      </form>
-    </section>
-  )
-}
-
 export function Console({ state, act, error }: { state: GameState; act: (a: Action) => void; error: { message: string } | null }) {
   const view = useMemo(() => project(state, GM), [state])
   const [reveal, setReveal] = useState(false)
@@ -130,12 +92,6 @@ export function Console({ state, act, error }: { state: GameState; act: (a: Acti
           <Banners view={view} />
           {error && <Notice tone="bad">{error.message}</Notice>}
           <p className="briefing">{PHASE_INFO[state.phase].briefing}</p>
-          <div className="row wrap">
-            {next && <button className="btn primary" onClick={() => setConfirming(true)}>Weiter: {PHASE_INFO[next].short}</button>}
-            <button className="btn" onClick={() => act({ type: paused ? 'resume' : 'pause' })}>{paused ? 'Fortsetzen' : 'Pausieren'}</button>
-            {state.failure && <button className="btn" onClick={() => act({ type: 'clearFailure' })}>Scheitern aufheben und weiterspielen</button>}
-            {state.phase === 'e6' && state.comms.silence && <button className="btn danger" onClick={() => act({ type: 'flagViolation' })}>Verstoß erfassen</button>}
-          </div>
           {progress(view, state).length > 0 && <ul className="progress">{progress(view, state).map((p) => <li key={p}>{p}</li>)}</ul>}
           <details>
             <summary>Schiffswerte korrigieren</summary>
@@ -158,7 +114,6 @@ export function Console({ state, act, error }: { state: GameState; act: (a: Acti
         </section>
 
         {debrief && <section className="card"><Lessons view={view} act={act} /></section>}
-        {!debrief && <Injects key={state.phase} state={state} act={act} />}
 
         {!debrief && state.phase !== 'checkin' && (
           <section className="card">
@@ -189,7 +144,18 @@ export function Console({ state, act, error }: { state: GameState; act: (a: Acti
           <p className="muted small">{ROLE_IDS.map(roleLabel).join(' · ')}</p>
         </section>
       </div>
-      <Chat view={view} act={act} />
+      <aside className="side-col">
+        <Chat view={view} act={act} />
+        <section className="card flow">
+          <h2>Ablauf</h2>
+          {state.failure && <button className="btn" onClick={() => act({ type: 'clearFailure' })}>Scheitern aufheben und weiterspielen</button>}
+          {state.phase === 'e6' && state.comms.silence && <button className="btn danger" onClick={() => act({ type: 'flagViolation' })}>Verstoß erfassen</button>}
+          <div className="row">
+            <button className="btn" onClick={() => act({ type: paused ? 'resume' : 'pause' })}>{paused ? 'Fortsetzen' : 'Pausieren'}</button>
+            {next && <button className="btn primary grow" onClick={() => setConfirming(true)}>Weiter: {PHASE_INFO[next].short}</button>}
+          </div>
+        </section>
+      </aside>
       {confirming && next && (
         <ConfirmAdvance
           state={state}

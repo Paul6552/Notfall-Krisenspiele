@@ -330,8 +330,10 @@ describe('Filme', () => {
   it('Start zeigt je nach Entscheidung den passenden Ausgang', () => {
     let s = toPhase(setup(7), 'e1')
     s = { ...s, settings: { ...s.settings, cutscenes: true } }
-    const late = reduce(s, { type: 'advance' }, GM, 9)
-    expect(late.cutscene).toMatchObject({ scene: 'launch', title: 'Gestartet mit Verspätung', tone: 'warn' })
+    // Ohne GO schaltet die Spielleitung weiter: kein verspäteter Start und keine Zeitstrafe
+    const forced = reduce(s, { type: 'advance' }, GM, 9)
+    expect(forced.cutscene).toMatchObject({ scene: 'launch', title: 'Erfolgreich gestartet', tone: 'good' })
+    expect(forced.ship.timeBuffer).toBe(s.ship.timeBuffer)
     s = reduce(s, { type: 'e1Decide', go: true }, owner(s, 'LS'), 5)
     for (let q = 0; q < 5; q++) s = reduce(s, { type: 'e1Mark', q, ok: true }, owner(s, 'LS'), 5)
     expect(reduce(s, { type: 'advance' }, GM, 9).cutscene).toMatchObject({ scene: 'launch', title: 'Erfolgreich gestartet', tone: 'good' })
@@ -343,6 +345,10 @@ describe('Filme', () => {
     for (let t = 1; s.phase !== 'done'; t++) {
       s = reduce(s, { type: 'advance' }, GM, t * 1000)
       if (s.failure) s = reduce(s, { type: 'clearFailure' }, GM, t * 1000)
+      if (s.phase === 'done') {
+        expect(s.cutscene).toBeNull() // Der Abspann lief schon nach der Landung
+        break
+      }
       seen.push(s.cutscene?.scene)
       expect(s.cutscene!.at).toBe(t * 1000)
       const id = s.cutscene!.id
@@ -355,8 +361,9 @@ describe('Filme', () => {
     }
     expect(seen).toContain('reactor')
     expect(seen.at(-1)).toBe('credits')
-    expect(seen).toHaveLength(17)
-    expect(seen.indexOf('servers')).toBe(seen.indexOf('storm') + 1)
+    expect(seen).toHaveLength(16)
+    expect(seen).not.toContain('servers')
+    expect(seen.at(-2)).toBe('failure') // Ohne Lande-Code scheitert die Landung, der Abspann folgt trotzdem
     expect(seen.indexOf('storm')).toBe(seen.indexOf('repair') + 1)
     expect(seen.indexOf('control')).toBe(seen.indexOf('prep') + 1)
     expect(seen.indexOf('bridge')).toBe(seen.indexOf('restart') + 1)
@@ -454,11 +461,27 @@ describe('Filme', () => {
     expect(s.phase).toBe('e3')
     expect(s.cutscene).toMatchObject({ scene: 'storm', title: 'Sonnen-Ionensturm!', tone: 'bad', released: false })
     expect(s.cutscene!.subtitle).toContain('alle Teams')
+    expect(s.cutscene!.subtitle).toContain('Kommunikationsserver')
     s = reduce(s, { type: 'releaseCutscene' }, GM, 40_000)
-    expect(s.cutscene).toMatchObject({ scene: 'servers', title: 'Kommunikationsserver beschädigt', tone: 'bad', released: false })
-    s = reduce(s, { type: 'releaseCutscene' }, GM, 70_000)
-    expect(s.cutscene).toMatchObject({ scene: 'servers', released: true })
-    expect(s.phaseStartedAt).toBe(70_000)
+    expect(s.cutscene).toMatchObject({ scene: 'storm', released: true })
+    expect(s.phaseStartedAt).toBe(40_000)
+  })
+  it('nach der Landung folgt der Abspann, erst dessen Freigabe öffnet Lessons Learned', () => {
+    let s = toPhase(setup(3), 'e7')
+    s = { ...s, settings: { ...s.settings, cutscenes: true }, e7: { ...s.e7, landed: true } }
+    s = reduce(s, { type: 'advance' }, GM, 1000)
+    expect(s.cutscene).toMatchObject({ scene: 'landing', title: 'Touchdown!', tone: 'good' })
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 30_000)
+    expect(s.phase).toBe('lessons')
+    expect(s.cutscene).toMatchObject({ scene: 'credits', released: false, at: 30_000 })
+    s = reduce(s, { type: 'releaseCutscene' }, GM, 60_000)
+    expect(s.cutscene).toMatchObject({ scene: 'credits', released: true })
+    expect(reduce(s, { type: 'advance' }, GM, 61_000).cutscene).toBeNull()
+  })
+  it('alte Spielstände mit dem Serverfilm zeigen den Sturmfilm', () => {
+    let s = toPhase(setup(3), 'e3')
+    s = { ...s, cutscene: { id: 9, scene: 'servers' as never, title: 'Alt', subtitle: '', tone: 'bad', at: 0, seconds: 13, released: false } }
+    expect(upgradeGame(s).cutscene).toMatchObject({ scene: 'storm', id: 9 })
   })
   it('Freigabe in einer Pause lässt die Uhr des Ereignisses bei null beginnen', () => {
     let s = reduce(setup(2, true), { type: 'advance' }, GM, 1000)

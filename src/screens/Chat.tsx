@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import { E6_INJECTS } from '../game/content/flugZumMars'
 import { teamName } from '../game/reducer'
 import { ALL, GM } from '../game/types'
 import type { Action, ChatMsg, View } from '../game/types'
 import { timeOf } from '../events/Lessons'
+
+/** Mit diesem Absender schreibt die Spielleitung offen. Jeder andere Name erscheint als eingespielte Meldung. */
+const GM_SENDER = 'Spielleitung'
+const SENDERS = [GM_SENDER, 'Unbekannter Sender', 'Flugkontrolle']
 
 const EMOJIS = ['⬆️', '⬇️', '⬅️', '➡️', '🛑', '✅', '❌', '⚡', '🔥', '☄️', '🚀', '🔋', '❗', '❓', '👍', '👎']
 
@@ -19,6 +24,8 @@ function status(view: View) {
 export function Chat({ view, act }: { view: View; act: (a: Action) => void }) {
   const [to, setTo] = useState(ALL)
   const [text, setText] = useState('')
+  const [sender, setSender] = useState(GM_SENDER)
+  const [org, setOrg] = useState(view.teams[0]?.name ?? '')
   const list = useRef<HTMLDivElement>(null)
   const gm = view.me === GM
   const st = status(view)
@@ -39,10 +46,11 @@ export function Chat({ view, act }: { view: View; act: (a: Action) => void }) {
     )
   }
 
-  const sender = (m: ChatMsg) => (m.kind === 'inject' ? m.fromLabel ?? 'Unbekannt' : m.kind === 'system' ? 'System' : teamName(view, m.from))
+  const disguised = gm && Boolean(sender.trim()) && sender.trim() !== GM_SENDER
+  const from = (m: ChatMsg) => (m.kind === 'inject' ? m.fromLabel ?? 'Unbekannt' : m.kind === 'system' ? 'System' : teamName(view, m.from))
   const send = () => {
     if (!text.trim()) return
-    act({ type: 'chat', to, text })
+    act(disguised ? { type: 'inject', text, label: sender.trim(), to } : { type: 'chat', to, text })
     setText('')
   }
   const targets = [{ id: ALL, name: 'Alle' }, ...view.teams.filter((t) => t.id !== view.me), ...(gm ? [] : [{ id: GM, name: 'Spielleitung' }])]
@@ -58,7 +66,7 @@ export function Chat({ view, act }: { view: View; act: (a: Action) => void }) {
         {view.chat.map((m) => (
           <div key={m.id} className={`msg ${m.from === view.me && !m.kind ? 'mine' : ''} ${m.kind ?? ''}`}>
             <div className="msg-head">
-              <strong>{sender(m)}</strong>
+              <strong>{from(m)}</strong>
               {m.to !== ALL && <span> → {teamName(view, m.to)}</span>}
               <time>{timeOf(m.ts)}</time>
             </div>
@@ -72,12 +80,43 @@ export function Chat({ view, act }: { view: View; act: (a: Action) => void }) {
           {EMOJIS.map((e) => <button key={e} type="button" aria-label={`Emoji ${e}`} onClick={() => setText(text + e)}>{e}</button>)}
         </div>
       )}
-      <form className="chat-form" onSubmit={(e) => { e.preventDefault(); send() }}>
+      {gm && (
+        <div className="gm-sender">
+          {view.phase === 'e6' && (
+            <div className="row wrap">
+              <label className="field">Organisation in der Vorlage
+                <select value={org} onChange={(e) => setOrg(e.target.value)}>{view.teams.map((t) => <option key={t.id}>{t.name}</option>)}</select>
+              </label>
+              <label className="field">Falschmeldung als Vorlage
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (!e.target.value) return
+                    setText(e.target.value.replaceAll('{org}', org))
+                    if (!disguised) setSender('Unbekannter Sender')
+                  }}
+                >
+                  <option value="">Vorlage wählen</option>
+                  {E6_INJECTS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+          <label className="field">Absender
+            <input list="chat-senders" value={sender} onChange={(e) => setSender(e.target.value)} onBlur={() => { if (!sender.trim()) setSender(GM_SENDER) }} />
+          </label>
+          <datalist id="chat-senders">{SENDERS.map((n) => <option key={n} value={n} />)}</datalist>
+          <p className="muted small">{disguised ? `Die Teams sehen „${sender.trim()}“ als Absender, nicht die Spielleitung. So spielt ihr Meldungen und Gerüchte ein.` : 'Ändert den Absender, um eine Meldung von außen einzuspielen, zum Beispiel „Unbekannter Sender“.'}</p>
+        </div>
+      )}
+      <form className={`chat-form ${gm ? 'gm' : ''}`} onSubmit={(e) => { e.preventDefault(); send() }}>
         <select aria-label="Empfänger" value={to} onChange={(e) => setTo(e.target.value)}>
           {targets.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
-        <input aria-label="Nachricht" disabled={blocked} placeholder={blocked ? 'Kein Kanal verfügbar' : 'Nachricht'} value={text} onChange={(e) => setText(e.target.value)} />
-        <button className="btn small" disabled={blocked}>Senden</button>
+        {gm
+          ? <textarea aria-label="Nachricht" rows={2} placeholder="Nachricht oder Meldung" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
+          : <input aria-label="Nachricht" disabled={blocked} placeholder={blocked ? 'Kein Kanal verfügbar' : 'Nachricht'} value={text} onChange={(e) => setText(e.target.value)} />}
+        <button className="btn small" disabled={blocked}>{disguised ? 'Einspielen' : 'Senden'}</button>
       </form>
     </section>
   )

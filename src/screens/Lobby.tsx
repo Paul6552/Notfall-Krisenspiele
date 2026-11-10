@@ -6,6 +6,7 @@ import { ROLE_IDS } from '../game/types'
 import type { Action, GameState, RoleId } from '../game/types'
 import { ShipScene } from '../ship/Ship'
 import { Notice } from './shared'
+import { SoundCheck } from './SoundCheck'
 
 function Copy({ text, label }: { text: string; label: string }) {
   const [done, setDone] = useState(false)
@@ -68,6 +69,7 @@ export function Lobby({ state, act, onError, setHostTeam }: {
           <fieldset>
             <legend>Erlebnis</legend>
             <label className="radio"><input type="checkbox" checked={state.settings.cutscenes !== false} onChange={(e) => act({ type: 'setSettings', settings: { cutscenes: e.target.checked } })} /> Filme zwischen den Ereignissen zeigen</label>
+            <SoundCheck />
           </fieldset>
         </section>
 

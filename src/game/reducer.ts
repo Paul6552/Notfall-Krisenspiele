@@ -175,9 +175,7 @@ function finishPhase(s: GameState, now: number) {
       if (s.e1.decision === 'go') {
         const wrong = E1_QUESTIONS.filter((_, i) => !s.e1.marks[i]).length
         if (wrong) hit(s, now, 'hull', -5 * wrong, `Start mit ${wrong} ungeklärten Prüfpunkten: die Hülle leidet.`)
-      } else {
-        hit(s, now, 'timeBuffer', -10, 'Startfreigabe kam nicht rechtzeitig: 10 Minuten Zeitpuffer verloren.')
-      }
+      } else log(s, now, 'Die Spielleitung hat den Start ohne GO der Brücke freigegeben.', 'info')
       break
     }
     case 'e2':
@@ -239,7 +237,7 @@ export function advanceWarnings(s: GameState): string[] {
   const list: string[] = []
   switch (s.phase) {
     case 'e1': {
-      if (s.e1.decision !== 'go') list.push('Die Brücke hat noch kein GO gegeben: −10 Minuten Zeitpuffer.')
+      if (s.e1.decision !== 'go') list.push('Die Brücke hat noch kein GO gegeben. Der Start erfolgt trotzdem, ohne Strafe.')
       else {
         const open = E1_QUESTIONS.filter((_, i) => !s.e1.marks[i]).length
         if (open) list.push(`${open} Prüfpunkte sind nicht als korrekt bestätigt: −${5 * open} Hülle.`)
@@ -283,8 +281,11 @@ export function advanceWarnings(s: GameState): string[] {
 /** Spielstände aus älteren Versionen hatten nur eine Antwort je Frage. */
 export function upgradeGame(state: GameState): GameState {
   const old = Object.entries(state.e1.answers as Record<string, unknown>).filter(([, a]) => typeof (a as { by?: unknown }).by === 'string')
-  if (!old.length) return state
+  // Der Film „servers“ ist im Sturmfilm aufgegangen.
+  const oldFilm = (state.cutscene?.scene as string | undefined) === 'servers'
+  if (!old.length && !oldFilm) return state
   const s = structuredClone(state)
+  if (oldFilm && s.cutscene) s.cutscene.scene = 'storm'
   for (const [q, a] of old) {
     const { text, by } = a as { text: string; by: string }
     s.e1.answers[Number(q)] = { [by]: text }
@@ -397,7 +398,7 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
     case 'releaseCutscene':
       needGm(actor)
       if (!s.cutscene || !held) break
-      s.cutscene = followUpCutscene(s.cutscene, now) ?? { ...s.cutscene, released: true }
+      s.cutscene = followUpCutscene(s.cutscene, now, s.phase) ?? { ...s.cutscene, released: true }
       // Die Uhr des Ereignisses läuft erst ab der Freigabe.
       s.phaseStartedAt = now
       s.pausedMs = 0
