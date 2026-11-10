@@ -564,6 +564,31 @@ describe('Filme', () => {
     s = { ...s, cutscene: { id: 9, scene: 'servers' as never, title: 'Alt', subtitle: '', tone: 'bad', at: 0, seconds: 13, released: false } }
     expect(upgradeGame(s).cutscene).toMatchObject({ scene: 'storm', id: 9 })
   })
+  it('Filme laufen ohne Halt: Am Ende startet von selbst der nächste Film, dann das Ereignis', () => {
+    let s = reduce(toPhase(setup(2, true), 'checkin'), { type: 'advance' }, GM, 1000)
+    expect(s.cutscene).toMatchObject({ scene: 'intro', released: false })
+    const end = (c = s.cutscene!) => c.at + c.seconds * 1000
+    expect(tick(s, end() - 1)).toBe(s) // Vor dem Ende passiert nichts
+    s = tick(s, end())
+    expect(s.cutscene).toMatchObject({ scene: 'prep', released: false })
+    s = tick(s, end())
+    expect(s.cutscene).toMatchObject({ scene: 'control', released: false })
+    const t = end()
+    s = tick(s, t)
+    expect(s.cutscene).toMatchObject({ scene: 'control', released: true })
+    expect(s.phase).toBe('e1')
+    expect(s.phaseStartedAt).toBe(t) // Die Uhr des Ereignisses läuft ab Filmende
+    expect(tick(s, t + 60_000).cutscene).toBe(s.cutscene)
+  })
+  it('Eine Pause hält den Film am Ende fest, Fortsetzen lässt ihn weiterlaufen', () => {
+    let s = reduce(toPhase(setup(2, true), 'checkin'), { type: 'advance' }, GM, 1000)
+    s = reduce(s, { type: 'pause' }, GM, 2000)
+    const end = s.cutscene!.at + s.cutscene!.seconds * 1000
+    expect(tick(s, end + 30_000)).toBe(s)
+    s = reduce(s, { type: 'resume' }, GM, end + 30_000)
+    s = tick(s, end + 31_000)
+    expect(s.cutscene).toMatchObject({ scene: 'prep', at: end + 31_000 })
+  })
   it('Freigabe in einer Pause lässt die Uhr des Ereignisses bei null beginnen', () => {
     let s = reduce(toPhase(setup(2, true), 'checkin'), { type: 'advance' }, GM, 1000)
     s = reduce(s, { type: 'pause' }, GM, 2000)

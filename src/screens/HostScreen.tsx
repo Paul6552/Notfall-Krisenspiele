@@ -5,7 +5,6 @@ import type { Action, GameState } from '../game/types'
 import { HostSession } from '../net/host'
 import { acquireHostLock, loadGame } from '../storage/db'
 import { CutsceneOverlay } from '../ship/Cutscene'
-import { PHASE_INFO } from '../game/content/flugZumMars'
 import { Console } from './Console'
 import { GameRoom } from './GameRoom'
 import { Lobby } from './Lobby'
@@ -116,7 +115,7 @@ function HostGame({ session }: { session: HostSession }) {
 
   return (
     <div>
-      <CutsceneOverlay cutscene={state.cutscene} teams={state.teams} roleOwner={state.roleOwner} onRelease={() => run({ type: 'releaseCutscene' })} nextTitle={PHASE_INFO[state.phase].title} />
+      <CutsceneOverlay cutscene={state.cutscene} teams={state.teams} roleOwner={state.roleOwner} paused={Boolean(state.pausedAt)} onResume={() => run({ type: 'resume' })} />
       {warning}
       {bridgeView && (
         <div className="tabs" role="tablist" aria-label="Ansicht">

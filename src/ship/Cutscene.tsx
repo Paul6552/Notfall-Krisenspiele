@@ -471,17 +471,18 @@ interface Props {
 interface OverlayProps extends Props {
   cutscene: Cutscene | null
   offset?: number
-  /** Nur die Spielleitung bekommt den Knopf zur Freigabe. */
-  onRelease?: () => void
-  nextTitle?: string
+  /** Ist die Übung pausiert (etwa nach der Rückkehr der Spielleitung), steht der Film am Ende still. Nur sie bekommt „Fortsetzen“. */
+  paused?: boolean
+  onResume?: () => void
   hostLost?: boolean
 }
 
 /**
- * Zeigt den Film bei allen gleichzeitig. Danach läuft das Schlussbild mit leiser Grundmusik weiter,
+ * Zeigt den Film bei allen gleichzeitig. Am Ende geht es von selbst weiter. Nur wer überspringt oder wenn pausiert ist,
+ * bleibt das Schlussbild mit leiser Musik stehen,
  * bis die Spielleitung freigibt.
  */
-export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRelease, nextTitle, hostLost = false }: OverlayProps) {
+export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, paused = false, onResume, hostLost = false }: OverlayProps) {
   const [finished, setFinished] = useState(0)
   /** Film, der bis zum Ende lief. Nur dann stehen alle Dauerläufer schon an ihrem Platz. */
   const [watched, setWatched] = useState(0)
@@ -524,7 +525,7 @@ export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRele
     return playFilm(cutscene, () => (Date.now() + offset - cutscene.at) / 1000, CAPTION_AT[cutscene.scene], reduced)
   }, [playing, id])
 
-  // Wartebild: Grundmusik, bis die Spielleitung freigibt.
+  // Wartebild nach dem Überspringen oder in einer Pause: leise Musik, bis es weitergeht.
   const waiting = active && !playing
   useEffect(() => {
     if (!waiting || !cutscene) return
@@ -553,9 +554,9 @@ export function CutsceneOverlay({ cutscene, teams, roleOwner, offset = 0, onRele
       {playing && <button ref={skip} className="c-skip c-skipfilm" onClick={() => setFinished(id)}>Überspringen</button>}
       {!playing && (
         <div className="c-wait" data-testid="cutscene-wait">
-          {onRelease
-            ? <button className="btn primary" onClick={onRelease}>Weiter für alle – {nextTitle}</button>
-            : <p role="status">{hostLost ? 'Die Verbindung zur Spielleitung ist unterbrochen. Es geht weiter, sobald sie zurück ist.' : 'Die Spielleitung gibt gleich den nächsten Abschnitt frei.'}</p>}
+          {paused && onResume
+            ? <button className="btn primary" onClick={onResume}>Fortsetzen</button>
+            : <p role="status">{hostLost ? 'Die Verbindung zur Spielleitung ist unterbrochen. Es geht weiter, sobald sie zurück ist.' : paused ? 'Die Übung ist pausiert. Es geht weiter, sobald die Spielleitung fortsetzt.' : 'Gleich geht es weiter …'}</p>}
         </div>
       )}
     </div>

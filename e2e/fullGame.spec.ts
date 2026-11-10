@@ -281,57 +281,44 @@ for (const n of [2, 6, 7]) {
   })
 }
 
-test('Filme laufen bei allen gleichzeitig und hängen vom Spielverlauf ab', async ({ context }) => {
+test('Filme laufen bei allen gleichzeitig, ohne Halt, und hängen vom Spielverlauf ab', async ({ context }) => {
   const { host, teams, as } = await setup(context, 2, true)
   const film = teams[1].getByTestId('cutscene')
-  const release = async () => {
-    await host.getByRole('button', { name: /Weiter für alle/ }).click()
-    for (const p of [host, ...teams]) await expect(p.getByTestId('cutscene')).toHaveCount(0)
-  }
+  const gone = async () => { for (const p of [host, ...teams]) await expect(p.getByTestId('cutscene')).toHaveCount(0, { timeout: 30_000 }) }
   // Beim Start in den Check-in läuft noch kein Film, damit sich erst alle einloggen. Der Titelfilm folgt danach.
   await expect(film).toHaveCount(0)
   await advance(host)
   await expect(film).toContainText('Mission Red Planet')
   await expect(host.getByTestId('cutscene')).toBeVisible()
   await teams[1].getByRole('button', { name: 'Überspringen' }).click()
-  // Überspringen führt nur zum Standbild und gilt nur für das eigene Team
-  await expect(teams[1].getByTestId('cutscene-wait')).toContainText('Spielleitung gibt gleich')
+  // Überspringen führt nur zum Standbild und gilt nur für das eigene Team. Freigeben muss niemand.
+  await expect(teams[1].getByTestId('cutscene-wait')).toContainText('Gleich geht es weiter')
   await expect(host.getByRole('button', { name: 'Überspringen' })).toBeVisible()
-  await expect(teams[1].getByRole('button', { name: /Weiter für alle/ })).toHaveCount(0)
   await host.getByRole('button', { name: 'Überspringen' }).click()
-  await host.getByRole('button', { name: /Weiter für alle/ }).click()
-  await expect(film).toContainText('Startvorbereitung')
-  await host.getByRole('button', { name: 'Überspringen' }).click()
-  await host.getByRole('button', { name: /Weiter für alle/ }).click()
-  await expect(film).toContainText('GO oder NO-GO?')
-  await host.getByRole('button', { name: 'Überspringen' }).click()
-  await release()
+  await expect(host.getByRole('button', { name: /Weiter für alle|Fortsetzen/ })).toHaveCount(0)
+  // Die Filme gehen von selbst ineinander über, danach beginnt das Ereignis.
+  await expect(film).toContainText('Startvorbereitung', { timeout: 15_000 })
+  await expect(film).toContainText('GO oder NO-GO?', { timeout: 15_000 })
+  await gone()
+  await expect(teams[1].getByTestId('phase-title')).toHaveText(/Ereignis 1/)
   const bridge = await as('LS')
   await bridge.getByRole('button', { name: /GO für den Start/ }).click()
   await advance(host)
   await expect(film).toContainText('Erfolgreich gestartet')
   await expect(teams[0].getByTestId('cutscene')).toContainText('auf dem Weg zum Mars')
 
-  // Neuladen während des Films: läuft weiter und bleibt am Ende stehen, bis die Spielleitung freigibt
+  // Neuladen während des Films: läuft weiter, danach folgt von selbst der Einschlag.
   await teams[1].getByRole('button', { name: 'Musik ausschalten' }).click()
   await expect(host.getByRole('button', { name: 'Musik ausschalten' })).toBeVisible() // Stumm gilt nur für das eigene Gerät
   await teams[1].reload()
   await expect(film).toBeVisible()
   await expect(teams[1].getByRole('button', { name: 'Musik einschalten' })).toBeVisible()
-  await expect(teams[1].getByTestId('cutscene-wait')).toBeVisible({ timeout: 30_000 })
-  await expect(film).toContainText('Erfolgreich gestartet')
-  await expect(host.getByRole('button', { name: /Weiter für alle – .*Hüllenschaden/ })).toBeVisible()
-  await teams[1].waitForTimeout(1500)
-  await expect(film).toBeVisible()
-  // Die Freigabe startet den zweiten Film, Ereignis 2 öffnet erst danach
-  await host.getByRole('button', { name: /Weiter für alle/ }).click()
-  await expect(film).toContainText('METEORITEN VORAUS')
-  await expect(host.getByTestId('cutscene')).toBeVisible()
+  await expect(film).toContainText('METEORITEN VORAUS', { timeout: 30_000 })
+  await expect(host.getByTestId('cutscene')).toContainText('WIR SIND GETROFFEN', { timeout: 30_000 })
   await host.getByRole('button', { name: 'Überspringen' }).click()
-  await expect(host.getByTestId('cutscene')).toContainText('WIR SIND GETROFFEN')
-  // Im Wartebild laufen Dauerläufer wie die Sterne weiter
+  // Im Standbild laufen Dauerläufer wie die Sterne weiter
   await expect.poll(() => host.locator('.cut.held .c-stars').first().evaluate((el) => getComputedStyle(el).animationIterationCount)).toBe('infinite')
-  await release()
+  await gone()
   await expect(teams[1].getByTestId('phase-title')).toHaveText(/Ereignis 2/)
 })
 

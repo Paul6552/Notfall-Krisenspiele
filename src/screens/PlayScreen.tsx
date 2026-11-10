@@ -102,7 +102,7 @@ function Connected({ session, code, onReset }: { session: ClientSession; code: s
   }
   return (
     <>
-      <CutsceneOverlay cutscene={view.cutscene} teams={view.teams} roleOwner={view.roleOwner} offset={clockOffset} hostLost={status === 'hostLost'} />
+      <CutsceneOverlay cutscene={view.cutscene} teams={view.teams} roleOwner={view.roleOwner} offset={clockOffset} paused={Boolean(view.pausedAt)} hostLost={status === 'hostLost'} />
       {lost}
       <GameRoom view={status === 'hostLost' ? { ...view, pausedAt: view.pausedAt ?? Date.now() } : view} act={session.dispatch} error={rejected} clockOffset={clockOffset} />
     </>

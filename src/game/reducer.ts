@@ -323,7 +323,24 @@ export function pauseAfterHostReturn(state: GameState, now: number): GameState {
   return s
 }
 
+/** Ein Film läuft bis zum Ende und gibt dann von selbst den nächsten Film oder das Ereignis frei. */
+function releaseCutscene(s: GameState, now: number) {
+  if (!s.cutscene || s.cutscene.released) return
+  s.cutscene = followUpCutscene(s.cutscene, now, s.phase) ?? { ...s.cutscene, released: true }
+  // Die Uhr des Ereignisses läuft erst ab der Freigabe.
+  s.phaseStartedAt = now
+  s.pausedMs = 0
+  if (s.pausedAt) s.pausedAt = now
+}
+
 export function tick(state: GameState, now: number): GameState {
+  // Filme halten nicht an. Nur eine Pause (etwa nach der Rückkehr der Spielleitung) hält sie am Ende fest.
+  const c = state.cutscene
+  if (c && !c.released && !state.pausedAt && now >= c.at + c.seconds * 1000) {
+    const s = structuredClone(state)
+    releaseCutscene(s, now)
+    return s
+  }
   if (state.phase !== 'e6' || state.pausedAt) return state
   const started = state.e6.restartStartedAt
   if (!started || state.e6.done || now - started < state.settings.restartSeconds * 1000) return state
@@ -348,7 +365,7 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
   const gm = actor === GM
   if (s.pausedAt && !gm && action.type !== 'chat') throw new RuleError('Die Übung ist pausiert.')
   const held = Boolean(s.cutscene && !s.cutscene.released)
-  if (held && !gm) throw new RuleError('Die Spielleitung gibt das nächste Ereignis gleich frei.')
+  if (held && !gm) throw new RuleError('Der Film läuft noch. Gleich geht es weiter.')
 
   switch (action.type) {
     case 'setSettings': {
@@ -401,7 +418,7 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
       break
     case 'advance': {
       needGm(actor)
-      if (held) throw new RuleError('Zuerst muss das aktuelle Ereignis freigegeben werden.')
+      if (held) throw new RuleError('Der Film läuft noch. Gleich geht es weiter.')
       const idx = PHASES.indexOf(s.phase)
       if (s.phase === 'done') throw new RuleError('Die Übung ist beendet.')
       if (s.phase === 'lobby') {
@@ -418,12 +435,7 @@ export function reduce(state: GameState, action: Action, actor: string, now: num
     }
     case 'releaseCutscene':
       needGm(actor)
-      if (!s.cutscene || !held) break
-      s.cutscene = followUpCutscene(s.cutscene, now, s.phase) ?? { ...s.cutscene, released: true }
-      // Die Uhr des Ereignisses läuft erst ab der Freigabe.
-      s.phaseStartedAt = now
-      s.pausedMs = 0
-      if (s.pausedAt) s.pausedAt = now
+      if (held) releaseCutscene(s, now)
       break
     case 'pause':
       needGm(actor)

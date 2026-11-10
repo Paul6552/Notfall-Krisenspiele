@@ -1,6 +1,6 @@
 /** Instrumente und Geräusche für die Filme. Alles entsteht im Browser, es gibt keine Audiodateien. */
 
-/** Halbtöne ab A4 (440 Hz). C5 = 3, C4 = −9, C3 = −21. */
+/** Halbtöne ab A4 (440 Hz). E2 = −29, E3 = −17, E4 = −5, E5 = 7. */
 export const note = (semitonesFromA4: number) => 440 * 2 ** (semitonesFromA4 / 12)
 
 type NoiseKind = 'white' | 'brown'
@@ -28,6 +28,21 @@ function noiseBuffer(ac: BaseAudioContext, kind: NoiseKind) {
     }
     return buffer
   })
+}
+
+/** Verzerrerkennlinie für die Gitarre: weich begrenzt wie ein Röhrenverstärker. */
+const curves = new WeakMap<BaseAudioContext, Float32Array<ArrayBuffer>>()
+function driveCurve(ac: BaseAudioContext) {
+  let curve = curves.get(ac)
+  if (!curve) {
+    curve = new Float32Array(1024)
+    for (let i = 0; i < curve.length; i++) {
+      const x = (i / (curve.length - 1)) * 2 - 1
+      curve[i] = Math.tanh(x * 6) / Math.tanh(6)
+    }
+    curves.set(ac, curve)
+  }
+  return curve
 }
 
 /** Raumklang: abklingendes Rauschen als Impulsantwort. */
@@ -63,12 +78,12 @@ export function createKit(ac: BaseAudioContext, out: AudioNode, base: number, fr
   fx.connect(out)
   const music = ac.createBiquadFilter()
   music.type = 'lowpass'
-  music.frequency.value = 9000
+  music.frequency.value = 11000
   music.connect(out)
   const hall = ac.createConvolver()
   hall.buffer = hallBuffer(ac)
   const hallLevel = ac.createGain()
-  hallLevel.gain.value = 0.2
+  hallLevel.gain.value = 0.14
   music.connect(hall).connect(hallLevel).connect(out)
 
   const keep = <T extends AudioScheduledSourceNode>(src: T, at: number, end: number) => {
@@ -192,87 +207,93 @@ export function createKit(ac: BaseAudioContext, out: AudioNode, base: number, fr
   }
 
   // ---------- Instrumente ----------
-  // Hell und luftig: Flächen, gezupfte Töne, Glockenspiel und ein leichtes Schlagzeug. Keine tiefen Dröhnklänge.
+  // Rock/Pop: verzerrte Gitarre, kräftiger Bass, Schlagzeug, dazu eine Leadstimme und etwas Keyboard.
 
-  /** Fläche: drei leicht verstimmte Sägezähne, offen gefiltert, weicher Ansatz. */
-  const pad = (n: number, t: number, d: number, vol = 0.03, attack = Math.min(0.35, d * 0.3)) => {
-    const e = sustain(music, t, d, { vol, attack, release: Math.min(0.6, d * 0.4) })
-    if (!e) return
-    const f = note(n)
-    const filter = lowpass(e.gain, Math.min(5200, Math.max(1400, f * 5)))
-    const mix = ac.createGain()
-    mix.gain.value = 0.3
-    mix.connect(filter)
-    for (const detune of [-8, 0, 7]) osc(mix, 'sawtooth', f, e.at, e.end, detune)
+  /** Gitarrenverstärker: Verzerrer, dann eine Box, die Bässe und schrille Höhen beschneidet. */
+  const amp = (dest: AudioNode, bright = 3400) => {
+    const pre = ac.createGain()
+    pre.gain.value = 2.2
+    const shaper = ac.createWaveShaper()
+    shaper.curve = driveCurve(ac)
+    shaper.oversample = '2x'
+    const low = ac.createBiquadFilter()
+    low.type = 'highpass'
+    low.frequency.value = 90
+    const body = ac.createBiquadFilter()
+    body.type = 'peaking'
+    body.frequency.value = 900
+    body.gain.value = 3
+    const cab = lowpass(dest, bright, 0.9)
+    pre.connect(shaper).connect(low).connect(body).connect(cab)
+    return pre
   }
 
-  /** Melodiestimme: hornartig, öffnet sich hell beim Ansatz, mit leichtem Vibrato. */
-  const lead = (n: number, t: number, d: number, vol = 0.06) => {
-    const e = sustain(music, t, d, { vol, attack: 0.03, release: Math.min(0.18, d / 2) })
+  /**
+   * Powerchord: Grundton, Quinte und Oktave über den Verzerrer.
+   * `mute` spielt ihn kurz und gedämpft (Palm-Mute) für treibende Achtel.
+   */
+  const guitar = (n: number, t: number, d: number, vol = 0.05, mute = false) => {
+    const e = mute ? struck(music, t, Math.min(d, 0.22), vol) : sustain(music, t, d, { vol, attack: 0.008, release: Math.min(0.25, d / 2) })
     if (!e) return
-    const filter = ac.createBiquadFilter()
-    filter.type = 'lowpass'
-    filter.Q.value = 0.8
-    filter.frequency.setValueAtTime(900, e.at)
-    filter.frequency.exponentialRampToValueAtTime(3600, Math.min(e.at + 0.08, e.end))
-    filter.frequency.exponentialRampToValueAtTime(2200, e.end)
-    filter.connect(e.gain)
-    const mix = ac.createGain()
-    mix.gain.value = 0.4
-    mix.connect(filter)
-    const voices = [osc(mix, 'sawtooth', note(n), e.at, e.end, -5), osc(mix, 'square', note(n), e.at, e.end, 5)]
-    if (d > 0.5) {
+    const input = amp(e.gain, mute ? 1500 : 3400)
+    for (const [interval, detune] of [[0, -6], [7, 5], [12, 0]] as const) {
+      const v = ac.createGain()
+      v.gain.value = interval === 12 ? 0.18 : 0.3
+      v.connect(input)
+      osc(v, 'sawtooth', note(n + interval), e.at, e.end, detune)
+    }
+  }
+
+  /** Leadstimme: singende, leicht verzerrte Gitarre mit Vibrato. */
+  const lead = (n: number, t: number, d: number, vol = 0.045) => {
+    const e = sustain(music, t, d, { vol, attack: 0.01, release: Math.min(0.15, d / 2) })
+    if (!e) return
+    const input = amp(e.gain, 4200)
+    input.gain.value = 1.2
+    const voices = [osc(input, 'sawtooth', note(n), e.at, e.end, -4), osc(input, 'square', note(n), e.at, e.end, 4)]
+    if (d > 0.45) {
       const lfo = ac.createOscillator()
-      lfo.frequency.value = 5.2
+      lfo.frequency.value = 5.6
       const depth = ac.createGain()
       depth.gain.setValueAtTime(0, e.at)
-      depth.gain.linearRampToValueAtTime(9, Math.min(e.at + 0.4, e.end))
+      depth.gain.linearRampToValueAtTime(14, Math.min(e.at + 0.35, e.end))
       lfo.connect(depth)
       for (const v of voices) depth.connect(v.detune)
       keep(lfo, e.at, e.end)
     }
   }
 
-  const bass = (n: number, t: number, d: number, vol = 0.1) => {
-    const e = sustain(music, t, d, { vol, attack: 0.01, release: Math.min(0.12, d / 2) })
+  /** E-Bass: Sägezahn und Sinus, mit einem Filter, das beim Anschlag kurz aufgeht. Man soll ihn hören. */
+  const bass = (n: number, t: number, d: number, vol = 0.14) => {
+    const e = sustain(music, t, d, { vol, attack: 0.005, release: Math.min(0.06, d / 3) })
     if (!e) return
     osc(e.gain, 'sine', note(n), e.at, e.end)
-    const upper = ac.createGain()
-    upper.gain.value = 0.35
-    upper.connect(lowpass(e.gain, 900))
-    osc(upper, 'triangle', note(n), e.at, e.end)
-  }
-
-  /** Marimba: weicher Schlag mit schnell verklingendem Oberton. */
-  const marimba = (n: number, t: number, vol = 0.05, d = 0.6) => {
-    const e = struck(music, t, d, vol)
-    if (!e) return
-    osc(e.gain, 'sine', note(n), e.at, e.end)
-    const tick = ac.createGain()
-    tick.gain.setValueAtTime(0.5, e.at)
-    tick.gain.exponentialRampToValueAtTime(0.001, e.at + 0.08)
-    tick.connect(e.gain)
-    osc(tick, 'sine', note(n) * 4, e.at, e.end)
-  }
-
-  /** Gezupfter, heller Ton für Arpeggien. */
-  const pluck = (n: number, t: number, vol = 0.045, d = 0.35) => {
-    const e = struck(music, t, d, vol)
-    if (!e) return
     const filter = ac.createBiquadFilter()
     filter.type = 'lowpass'
-    filter.frequency.setValueAtTime(5000, e.at)
-    filter.frequency.exponentialRampToValueAtTime(900, e.end)
+    filter.Q.value = 2
+    filter.frequency.setValueAtTime(1400, e.at)
+    filter.frequency.exponentialRampToValueAtTime(380, Math.min(e.at + 0.18, e.end))
     filter.connect(e.gain)
-    osc(filter, 'triangle', note(n), e.at, e.end)
-    const edge = ac.createGain()
-    edge.gain.value = 0.25
-    edge.connect(filter)
-    osc(edge, 'square', note(n), e.at, e.end)
+    const growl = ac.createGain()
+    growl.gain.value = 0.55
+    growl.connect(filter)
+    osc(growl, 'sawtooth', note(n), e.at, e.end)
   }
 
-  /** Glockenspiel. */
-  const bell = (n: number, t: number, vol = 0.04, d = 1.4) => {
+  /** Keyboard: heller E-Piano-Anschlag für Akkorde im Hintergrund. */
+  const keys = (n: number, t: number, d: number, vol = 0.025) => {
+    const e = struck(music, t, Math.max(0.6, d), vol)
+    if (!e) return
+    osc(e.gain, 'sine', note(n), e.at, e.end)
+    const bell = ac.createGain()
+    bell.gain.setValueAtTime(0.35, e.at)
+    bell.gain.exponentialRampToValueAtTime(0.001, e.at + 0.3)
+    bell.connect(e.gain)
+    osc(bell, 'sine', note(n) * 3, e.at, e.end)
+  }
+
+  /** Glocke für kleine Glanzpunkte. */
+  const bell = (n: number, t: number, vol = 0.03, d = 1.2) => {
     const e = struck(music, t, d, vol)
     if (!e) return
     const f = note(n)
@@ -284,15 +305,9 @@ export function createKit(ac: BaseAudioContext, out: AudioNode, base: number, fr
     }
   }
 
-  /** Weiche Bassdrum. */
-  const kick = (t: number, vol = 0.22) => {
-    const e = struck(music, t, 0.32, vol)
-    if (!e) return
-    const o = osc(e.gain, 'sine', 140, e.at, e.end)
-    o.frequency.exponentialRampToValueAtTime(48, e.at + 0.12)
-  }
+  // ---------- Schlagzeug ----------
 
-  const noiseHit = (t: number, d: number, vol: number, type: BiquadFilterType, freq: number) => {
+  const noiseHit = (t: number, d: number, vol: number, type: BiquadFilterType, freq: number, q = 0.8) => {
     const e = struck(music, t, d, vol)
     if (!e) return
     const src = ac.createBufferSource()
@@ -301,31 +316,48 @@ export function createKit(ac: BaseAudioContext, out: AudioNode, base: number, fr
     const f = ac.createBiquadFilter()
     f.type = type
     f.frequency.value = freq
+    f.Q.value = q
     src.connect(f).connect(e.gain)
     keep(src, e.at, e.end)
   }
-  const hat = (t: number, vol = 0.02) => noiseHit(t, 0.05, vol, 'highpass', 7500)
-  const clap = (t: number, vol = 0.05) => noiseHit(t, 0.16, vol, 'bandpass', 1600)
-  const cymbal = (t: number, vol = 0.04, d = 1.6) => noiseHit(t, d, vol, 'highpass', 5200)
 
-  /** Pauke für Akzente, gestimmt auf C. */
-  const timpani = (t: number, vol = 0.22, n = -21) => {
-    const e = struck(music, t, 0.6, vol)
+  /** Bassdrum mit Druck: tiefer Sinus, der schnell fällt, und ein kurzer Klick. */
+  const kick = (t: number, vol = 0.32) => {
+    const e = struck(music, t, 0.38, vol)
     if (!e) return
-    const o = osc(e.gain, 'sine', note(n) * 1.4, e.at, e.end)
-    o.frequency.exponentialRampToValueAtTime(note(n), e.at + 0.05)
+    const o = osc(e.gain, 'sine', 160, e.at, e.end)
+    o.frequency.exponentialRampToValueAtTime(45, e.at + 0.1)
+    noiseHit(t, 0.012, vol * 0.25, 'highpass', 3000)
   }
 
-  /** Anschwellen vor einem Höhepunkt, hell statt grollend. */
-  const riser = (t: number, d: number, vol = 0.05) => noise(t, d, { filter: 'bandpass', freq: 600, to: 5000, q: 1, vol, attack: d * 0.95, release: d * 0.04 })
+  /** Snare: Fell und Teppich. */
+  const snare = (t: number, vol = 0.1) => {
+    const e = struck(music, t, 0.14, vol * 0.6)
+    if (e) {
+      const o = osc(e.gain, 'triangle', 220, e.at, e.end)
+      o.frequency.exponentialRampToValueAtTime(160, e.end)
+    }
+    noiseHit(t, 0.2, vol, 'bandpass', 2600, 0.6)
+  }
+
+  const hat = (t: number, vol = 0.025, open = false) => noiseHit(t, open ? 0.3 : 0.045, vol, 'highpass', 8000)
+  const crash = (t: number, vol = 0.05, d = 1.8) => noiseHit(t, d, vol, 'highpass', 5000)
+  const tom = (t: number, n: number, vol = 0.14) => {
+    const e = struck(music, t, 0.3, vol)
+    if (!e) return
+    const o = osc(e.gain, 'sine', note(n) * 1.5, e.at, e.end)
+    o.frequency.exponentialRampToValueAtTime(note(n), e.at + 0.08)
+  }
+
+  /** Trommelwirbel über die Toms vor einem Einsatz. */
+  const fill = (t: number, beat: number, vol = 1) => {
+    ;[-17, -17, -20, -20, -24, -24, -27, -27].forEach((n, i) => tom(t + (i * beat) / 4, n, 0.13 * vol))
+  }
+
+  /** Anschwellen vor einem Höhepunkt. */
+  const riser = (t: number, d: number, vol = 0.04) => noise(t, d, { filter: 'bandpass', freq: 500, to: 6000, q: 1, vol, attack: d * 0.95, release: d * 0.04 })
 
   // ---------- Satz ----------
-
-  /** Akkord als Fläche, der tiefste Ton im Bass. */
-  const chord = (notes: readonly number[], t: number, d: number, vol = 0.03, withBass = true) => {
-    for (const n of notes.slice(1)) pad(n, t, d, vol)
-    if (withBass) bass(notes[0], t, d, vol * 3)
-  }
 
   /** Melodie aus [Halbton, Schläge]. Gibt die Länge in Sekunden zurück. */
   const line = (play: (n: number, t: number, d: number) => void, notes: readonly (readonly [number, number])[], t: number, beat: number, transpose = 0) => {
@@ -337,50 +369,67 @@ export function createKit(ac: BaseAudioContext, out: AudioNode, base: number, fr
     return x - t
   }
 
-  /** Aufsteigendes Arpeggio in Achteln über den Akkordtönen. */
-  const arp = (notes: readonly number[], t: number, beats: number, beat: number, vol = 0.04, transpose = 12) => {
-    const up = notes.slice(1)
-    const pattern = [0, 1, 2, 3, 2, 1, 3, 2]
-    for (let i = 0; i < beats * 2; i++) pluck(up[pattern[i % 8] % up.length] + transpose, t + i * beat * 0.5, i % 2 ? vol * 0.8 : vol, beat * 0.8)
-  }
-
-  /** Leichter Rhythmus: Bassdrum auf 1 und 3, Klatschen auf 2 und 4, Achtel im Hi-Hat. */
-  const groove = (t: number, beats: number, beat: number, level = 1) => {
-    for (let b = 0; b < beats; b++) {
-      const x = t + b * beat
-      if (b % 2 === 0) kick(x, 0.2 * level)
-      else clap(x, 0.04 * level)
-      hat(x, 0.014 * level)
-      hat(x + beat / 2, 0.02 * level)
+  /** Rock-Beat: Bassdrum auf 1, „und“ von 2 und 3, Snare auf 2 und 4, Achtel-Hi-Hat. */
+  const beat = (t: number, beats: number, b: number, level = 1, half = false) => {
+    for (let i = 0; i < beats; i++) {
+      const x = t + i * b
+      if (i % 4 === 0 || i % 4 === 2) kick(x, 0.3 * level)
+      if (!half && i % 4 === 1) kick(x + b / 2, 0.22 * level)
+      if (half ? i % 4 === 2 : i % 2 === 1) snare(x, 0.1 * level)
+      hat(x, 0.024 * level)
+      hat(x + b / 2, 0.016 * level)
     }
   }
 
-  return { sources, tone, noise, crackle, thump, whoosh, siren, pad, lead, bass, marimba, pluck, bell, kick, hat, clap, cymbal, timpani, riser, chord, line, arp, groove }
+  /**
+   * Begleitung einer Akkordfolge als Band: Bass in Achteln, Gitarre gedämpft in Achteln
+   * oder offen angeschlagen, Keyboard leise darüber. Gibt die Länge zurück.
+   */
+  const band = (chords: Progression, t: number, b: number, o: { level?: number; open?: boolean; drums?: boolean; half?: boolean } = {}) => {
+    const { level = 1, open = false, drums = true, half = false } = o
+    let x = t
+    for (const [c, beats] of chords) {
+      for (let i = 0; i < beats * 2; i++) {
+        const y = x + (i * b) / 2
+        bass(c.root + (i % 4 === 3 ? 12 : 0), y, b * 0.46, 0.13 * level)
+        if (!open) guitar(c.root + 12, y, b / 2, (i % 2 ? 0.032 : 0.042) * level, true)
+      }
+      if (open) guitar(c.root + 12, x, beats * b, 0.04 * level)
+      for (const n of c.keys) keys(n, x, beats * b, 0.012 * level)
+      if (drums) beat(x, beats, b, level, half)
+      x += beats * b
+    }
+    return x - t
+  }
+
+  return { sources, tone, noise, crackle, thump, whoosh, siren, guitar, lead, bass, keys, bell, kick, snare, hat, crash, tom, fill, riser, line, beat, band }
 }
 
-// Helles C-Dur, tiefster Ton zuerst.
+/** Akkord: Grundton für Bass und Gitarre (tiefe Lage), dazu Keyboard-Töne in der Mitte. */
+export interface Chord { root: number; keys: readonly number[] }
+const chord = (root: number, keys: number[]): Chord => ({ root, keys })
+
+// E-Dur, gitarrenfreundlich. Grundtöne in der Lage des E-Basses.
 export const CHORD = {
-  C: [-21, -9, -5, -2, 3],
-  Cadd9: [-21, -9, -7, -2, 3],
-  F: [-28, -9, -4, 0, 3],
-  Fadd9: [-28, -9, -4, -2, 0],
-  G: [-26, -10, -7, -2, 2],
-  Gsus: [-26, -9, -7, -2, 3],
-  Am: [-24, -9, -5, 0, 3],
-  Em: [-29, -10, -5, -2, 2],
-  Dm: [-31, -7, -4, 0, 5],
-  Bb: [-23, -11, -7, -4, 1],
-} satisfies Record<string, number[]>
+  E: chord(-29, [-5, -1, 2]),
+  B: chord(-22, [-10, -6, -3]),
+  Cshm: chord(-20, [-8, -5, -1]),
+  A: chord(-24, [-8, -5, 0]),
+  Fshm: chord(-27, [-3, 0, 4]),
+  G: chord(-26, [-10, -7, -2]),
+  D: chord(-19, [-7, -3, 0]),
+  C: chord(-21, [-9, -5, -2]),
+} satisfies Record<string, Chord>
 
 /** Begleitung als [Akkord, Schläge]. */
-export type Progression = readonly (readonly [readonly number[], number])[]
+export type Progression = readonly (readonly [Chord, number])[]
 type Melody = readonly (readonly [number, number])[]
 
-/** ARES-Thema, erster Teil: steigt auf und öffnet sich. Vier Takte über I–V–vi–IV. */
-export const THEME_A: Melody = [[-2, 1], [3, 1], [7, 1.5], [5, 0.5], [5, 2], [2, 1], [-2, 1], [0, 1], [3, 1], [7, 1], [12, 1], [10, 2], [8, 1], [7, 1]]
-export const THEME_A_CHORDS: Progression = [[CHORD.C, 4], [CHORD.G, 4], [CHORD.Am, 4], [CHORD.F, 4]]
-/** Zweiter Teil: schwingt sich hoch und kommt strahlend zu Hause an. */
-export const THEME_B: Melody = [[8, 1.5], [7, 0.5], [5, 1], [3, 1], [7, 2], [10, 2], [12, 1.5], [10, 0.5], [8, 1], [5, 1], [7, 1], [5, 0.5], [2, 0.5], [3, 2]]
-export const THEME_B_CHORDS: Progression = [[CHORD.F, 4], [CHORD.C, 4], [CHORD.Dm, 2], [CHORD.G, 2], [CHORD.C, 4]]
-/** Aufregung, aber zuversichtlich: vi–IV–I–V mit treibendem Puls. */
-export const ACTION_CHORDS = [CHORD.Am, CHORD.F, CHORD.C, CHORD.G]
+/** ARES-Thema, Strophe: über E – H – Cis-Moll – A, die klassische Pop-Rock-Folge. */
+export const THEME_A: Melody = [[2, 0.5], [2, 0.5], [7, 1], [6, 0.5], [7, 0.5], [9, 1], [6, 2], [4, 1], [2, 1], [4, 0.5], [4, 0.5], [7, 1], [11, 1.5], [9, 0.5], [9, 2], [7, 1], [4, 1]]
+export const THEME_A_CHORDS: Progression = [[CHORD.E, 4], [CHORD.B, 4], [CHORD.Cshm, 4], [CHORD.A, 4]]
+/** Refrain: steigt hoch und landet auf dem Grundton. */
+export const THEME_B: Melody = [[9, 1.5], [11, 0.5], [12, 1], [9, 1], [11, 2], [7, 1], [11, 1], [9, 1], [12, 1], [11, 1], [6, 1], [9, 0.5], [7, 0.5], [7, 3]]
+export const THEME_B_CHORDS: Progression = [[CHORD.A, 4], [CHORD.E, 4], [CHORD.Fshm, 2], [CHORD.B, 2], [CHORD.E, 4]]
+/** Action: E – G – A – D, kerniger Rock mit Tempo. */
+export const ACTION_CHORDS: Progression = [[CHORD.E, 4], [CHORD.G, 4], [CHORD.A, 4], [CHORD.D, 4]]
